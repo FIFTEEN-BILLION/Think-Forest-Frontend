@@ -1,0 +1,29 @@
+{
+  "name": "@jjcp/app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./components": "./src/components/index.ts",
+    "./screens": "./src/screens/index.ts",
+    "./providers": "./src/providers/AppProviders.tsx",
+    "./styles": "./src/styles/theme.ts",
+    "./styles/web.css": "./src/styles/web.css",
+    "./api": "./src/api/index.ts",
+    "./native": "./src/native/NativeApp.tsx"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@emotion/native": "^11.11.0",
+    "@emotion/react": "^11.14.0",
+    "@tanstack/react-query": "^5.90.0"
+  },
+  "peerDependencies": {
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": ">=5.6.2 <6",
+    "react-native-webview": ">=13.16.1 <15"
+  }
+}

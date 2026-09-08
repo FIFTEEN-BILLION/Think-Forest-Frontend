@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+.expo/
+.vite/
+coverage/
+*.tsbuildinfo
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+legacy/
+apps/native/android/
+apps/native/ios/

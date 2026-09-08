@@ -1,0 +1,5 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": { "types": ["react", "node"] },
+  "include": ["**/*.ts", "**/*.tsx", "../../packages/app/src/styles/emotion.d.ts"]
+}

@@ -10,6 +10,7 @@
     "./styles": "./src/styles/theme.ts",
     "./styles/web.css": "./src/styles/web.css",
     "./api": "./src/api/index.ts",
+    "./hooks": "./src/hooks/index.ts",
     "./native": "./src/native/NativeApp.tsx"
   },
   "scripts": {

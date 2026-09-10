@@ -77,29 +77,36 @@ npm run ios            # Expo + iOS 실행 (macOS)
 
 ## API
 
-`AppProviders`에 TanStack Query가 연결되어 있습니다. API 주소와 명세는 아직
-정해지지 않았으므로 실제 요청은 하지 않습니다. `api/`에 도메인별 요청 함수를,
-`hooks/`에 `useQuery` 및 `useMutation` 훅을 추가합니다.
+자람마을 백엔드(`../backend`, FastAPI)에 연결되어 있습니다.
 
-```ts
-import { createApiClient } from '@jjcp/app/api';
-import { useQuery } from '@tanstack/react-query';
+- 백엔드 주소는 `apps/web/.env` 의 `VITE_API_BASE_URL` 로 주입합니다
+  (`apps/web/.env.example` 참고, 기본값 `http://127.0.0.1:8000`). `apps/web/src/main.tsx`
+  가 이 값을 읽어 `<AppProviders apiBaseUrl={...}>` 로 넘기고, `ApiClientProvider` 가
+  `createApiClient` 로 요청 함수를 만들어 컨텍스트로 제공합니다. 그래서 `@jjcp/app`
+  패키지는 Vite 환경변수에 묶이지 않습니다.
+- **타입**: `packages/app/src/api/types.ts` 가 백엔드 `app/schemas/*` 계약(camelCase)을
+  그대로 옮긴 것입니다. 백엔드 스키마를 바꾸면 이 파일도 함께 고칩니다.
+- **도메인 함수**: `packages/app/src/api/endpoints.ts` — `scoreRubric`, `generateScript`,
+  `getScriptLibrary`, `createLabActivity`, `summarizeReport`, `assessDiagnostic`,
+  `getTechPanel`, `getHealth`. 순수 함수로 `request` 를 인자로 받습니다.
+- **훅**: `@jjcp/app/hooks` — 읽기는 `useQuery`(`useHealth`, `useScriptLibrary`,
+  `useScriptLibraryItem`, `useTechPanel`), 생성/채점은 `useMutation`
+  (`useDiagnosticAssess`, `useRubricScore`, `useScriptGeneration`, `useLabActivity`,
+  `useReportSummary`).
 
-const request = createApiClient('https://api.example.com');
+```tsx
+import { useRubricScore } from '@jjcp/app/hooks';
 
-type Item = { id: string; name: string };
-
-export function useItems() {
-  return useQuery({
-    queryKey: ['items'],
-    queryFn: ({ signal }) => request<Item[]>('/items', { signal }),
-  });
+function RetellGate() {
+  const score = useRubricScore();
+  // score.mutate({ question, answer, child, consent: { guardian: true } })
+  // 응답의 res.ai 로 "실제 AI / 파라메트릭 렌더링" 배지를 바꾼다
 }
 ```
 
-요청 함수의 제네릭은 컴파일 시점 타입입니다. 서버 응답의 런타임 검증은 API 명세가
-정해졌을 때 추가합니다. JSON 본문을 보낼 때는 `Content-Type: application/json`과
-`JSON.stringify`를 지정합니다. 204 응답은 `request<void>`로 사용합니다.
+모든 AI 응답에는 `ai: boolean` 과 `error: string | null` 이 들어옵니다. 마음극장 대본은
+실패해도 HTTP 200 으로 `{ ai:false, safe:false }` 가 오므로 `onError` 가 아니라 응답 본문을
+확인합니다. 서버 응답의 런타임 검증(zod 등)은 계약이 안정되면 추가합니다.
 
 참고: [Vite](https://vite.dev/guide/),
 [@emotion/native](https://emotion.sh/docs/%40emotion/native),

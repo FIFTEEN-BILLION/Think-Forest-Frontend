@@ -15,7 +15,7 @@ import { Icon } from '../components/Icon';
 import { ForestArt, VillageArt } from '../components/Artwork';
 import { StageArt } from '../components/Simulation';
 import type { Track } from '../types';
-import { INQUIRY_STEPS } from '../lib/inquiry';
+import { THINKING_STEPS, THINKING_STEP_HINTS } from '../lib/thinking';
 const stepDescriptions: Record<Track, string[]> = {
   forest: [
     '이야기를 읽고 눈에 보이는 단서를 살펴봐요.',
@@ -105,27 +105,22 @@ export function AdventureScreen() {
             <span className="eyebrow">TODAY'S ADVENTURE</span>
             <h2>이번 모험은 이렇게 진행돼요.</h2>
             <ol className="journey-list">
-              {(activity.id === 'first-inquiry' ? INQUIRY_STEPS : PLACES[activity.track].steps).map(
-                (s, i) => (
-                  <li key={s}>
-                    <span>{String(i + 1).padStart(2, '0')}</span>
-                    <div>
-                      <strong>{s}</strong>
-                      <small>
-                        {activity.id === 'first-inquiry'
-                          ? [
-                              '어떻게 될지 내 생각과 이유를 먼저 적어요.',
-                              '질문을 읽고 내가 말한 뜻을 확인해요.',
-                              '빛이 낮을 때와 높을 때의 결과를 살펴봐요.',
-                              '생각을 유지할지, 바꿀지, 더 알아볼지 골라요.',
-                              '처음과 지금의 생각을 비교하고 책장에 남겨요.',
-                            ][i]
-                          : stepDescriptions[activity.track][i]}
-                      </small>
-                    </div>
-                  </li>
-                ),
-              )}
+              {(activity.id === 'first-inquiry'
+                ? THINKING_STEPS
+                : PLACES[activity.track].steps
+              ).map((s, i) => (
+                <li key={s}>
+                  <span>{String(i + 1).padStart(2, '0')}</span>
+                  <div>
+                    <strong>{s}</strong>
+                    <small>
+                      {activity.id === 'first-inquiry'
+                        ? THINKING_STEP_HINTS[i]
+                        : stepDescriptions[activity.track][i]}
+                    </small>
+                  </div>
+                </li>
+              ))}
             </ol>
             {preview && (
               <Notice>

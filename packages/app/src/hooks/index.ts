@@ -6,3 +6,4 @@ export { useScriptGeneration, useScriptLibrary, useScriptLibraryItem } from './u
 export { useLabActivity } from './useLabActivity';
 export { useReportSummary } from './useReportSummary';
 export { useTechPanel } from './useTechPanel';
+export { useShadowMission } from './useShadowMission';

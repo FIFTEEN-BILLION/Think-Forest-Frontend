@@ -21,6 +21,93 @@ export interface Inquiry {
   finalReason: string;
 }
 
+// First inquiry v2: the "teach the confused thinking friend" engine.
+export type ShadowVariable = 'lightHeight' | 'stickHeight' | 'distance' | 'brightness';
+export interface ShadowSetup {
+  lightHeight: 'low' | 'mid' | 'high';
+  stickHeight: 'short' | 'tall';
+  distance: 'near' | 'far';
+  brightness: 'dim' | 'bright';
+}
+export type Effect = 'longer' | 'shorter' | 'same';
+export type ClaimEffect = Effect | 'unknown';
+export type Confidence = 1 | 2 | 3;
+export type AiSource = 'ai' | 'fallback';
+export type HelpLevel = 'probe' | 'hint' | 'explanation';
+export type InputOrigin = 'example' | 'adult';
+export type ChallengeJudgment = 'agree' | 'disagree' | 'unsure';
+export type SkillId = 'predict' | 'fairTest' | 'evidence' | 'revise' | 'transfer';
+export type SkillLevel = 'independent' | 'afterProbe' | 'afterExplanation' | 'notShown';
+export interface ThinkingClaim {
+  variable: ShadowVariable;
+  effect: ClaimEffect;
+}
+export interface ThinkingExperiment {
+  id: string;
+  base: ShadowSetup;
+  compare: ShadowSetup;
+  baseLength: number;
+  compareLength: number;
+  prediction: Effect;
+  observed: boolean;
+  feedback: HelpLevel | null;
+  surprise: string;
+}
+export interface TeachExchange {
+  message: string;
+  cardIds: string[];
+  convinced: boolean;
+  helpLevel: HelpLevel | null;
+  reply: string;
+  source: AiSource;
+}
+export interface ThinkingChallenge {
+  id: string;
+  line: string;
+  base: ShadowSetup;
+  compare: ShadowSetup;
+  baseLength: number;
+  compareLength: number;
+  friendPrediction: Effect;
+  confounded: boolean;
+  friendCorrect: boolean;
+  source: AiSource;
+  judgment: ChallengeJudgment | null;
+  reason: string;
+  observed: boolean;
+}
+export interface SkillResult {
+  skill: SkillId;
+  level: SkillLevel;
+  quote: string;
+}
+export interface ThinkingInquiry {
+  version: 2;
+  prediction: ClaimEffect | null;
+  reason: string;
+  reasonSkipped: boolean;
+  origin: InputOrigin;
+  confidenceBefore: Confidence | null;
+  restatement: string;
+  restatementConfirmed: boolean;
+  claims: ThinkingClaim[];
+  interpretSource: AiSource | null;
+  friendBeliefId: string;
+  friendLine: string;
+  friendVariable: ShadowVariable | null;
+  checkPlan: string;
+  experiments: ThinkingExperiment[];
+  exchanges: TeachExchange[];
+  convinced: boolean;
+  judgment: InquiryJudgment | null;
+  final: string;
+  finalReason: string;
+  confidenceAfter: Confidence | null;
+  challenge: ThinkingChallenge | null;
+  finalClaims: ThinkingClaim[];
+  skills: SkillResult[];
+}
+
 export interface Draft {
   id: string;
   track: Track;
@@ -35,6 +122,7 @@ export interface Draft {
   followup: string;
   hints: number;
   inquiry?: Inquiry;
+  thinking?: ThinkingInquiry;
   lab: {
     mode: LabMode;
     topic: string;
@@ -67,13 +155,15 @@ export interface SessionRecord {
   source: Provenance;
   text: string;
   answers: Answer[];
-  rubric: Rubric;
+  // Absent for first inquiry v2 records: they show thinking skills, never scores.
+  rubric?: Rubric;
   story?: Story;
   emotion?: string;
   choice?: number;
   observations?: Draft['lab'];
   favorite: boolean;
   inquiry?: Inquiry;
+  thinking?: ThinkingInquiry;
 }
 
 export interface Diagnosis {
@@ -135,6 +225,43 @@ export type LearningEvent =
   | { type: 'inquiry-observe' }
   | { type: 'inquiry-judge'; judgment: InquiryJudgment }
   | { type: 'inquiry-back' }
+  | { type: 'think-predict'; prediction: ClaimEffect }
+  | { type: 'think-reason'; value: string; origin: InputOrigin }
+  | { type: 'think-skip-reason'; skipped: boolean }
+  | { type: 'think-confidence'; when: 'before' | 'after'; value: Confidence }
+  | {
+      type: 'think-interpret';
+      claims: ThinkingClaim[];
+      restatement: string;
+      friendBeliefId: string;
+      friendLine: string;
+      friendVariable: ShadowVariable;
+      source: AiSource;
+    }
+  | { type: 'think-restatement'; confirmed: boolean }
+  | { type: 'think-back' }
+  | { type: 'think-plan'; value: string }
+  | {
+      type: 'think-experiment';
+      id: string;
+      compare: ShadowSetup;
+      prediction: Effect;
+      baseLength: number;
+      compareLength: number;
+    }
+  | { type: 'think-observe'; id: string }
+  | { type: 'think-surprise'; id: string; value: string }
+  | { type: 'think-teach'; exchange: TeachExchange }
+  | { type: 'think-judge'; judgment: InquiryJudgment }
+  | { type: 'think-final'; field: 'final' | 'finalReason'; value: string }
+  | {
+      type: 'think-challenge';
+      challenge: Omit<ThinkingChallenge, 'judgment' | 'reason' | 'observed'>;
+      finalClaims: ThinkingClaim[];
+    }
+  | { type: 'think-challenge-judge'; judgment: ChallengeJudgment }
+  | { type: 'think-challenge-reason'; value: string }
+  | { type: 'think-challenge-observe' }
   | { type: 'text'; text: string }
   | { type: 'hint' }
   | { type: 'advance' }

@@ -4,8 +4,12 @@ import { PLACES, RUBRIC, TRACKS } from '../data/catalog';
 import { useVillage } from '../state/VillageProvider';
 import { average } from '../lib/learning';
 import { Button, EmptyState, Notice, PageHeading, Provenance } from '../components/ui';
-import type { SessionRecord } from '../types';
-function ProgressChart({ records }: { records: SessionRecord[] }) {
+import type { Rubric, SessionRecord } from '../types';
+// Thinking-skill records (first inquiry v2) have no score and stay out of score views.
+type ScoredRecord = SessionRecord & { rubric: Rubric };
+const scoredOnly = (records: SessionRecord[]) =>
+  records.filter((r): r is ScoredRecord => Boolean(r.rubric));
+function ProgressChart({ records }: { records: ScoredRecord[] }) {
   const rows = records.slice(0, 7).reverse();
   const x = (i: number) => (rows.length === 1 ? 260 : 45 + (i * 430) / (rows.length - 1)),
     y = (value: number) => 190 - value * 1.5;
@@ -87,6 +91,7 @@ export function ReportScreen() {
     (r) =>
       (source === 'all' || r.source === source) && Date.parse(r.completedAt) >= now - 7 * 86400000,
   );
+  const scored = scoredOnly(records);
   const includesMock = records.some((r) => r.source === 'mock');
   const summaryMatches =
     data.summary &&
@@ -183,8 +188,8 @@ export function ReportScreen() {
             <h3>생각 발자국의 변화</h3>
             <small className="muted">선택 기간 중 최근 7개</small>
           </div>
-          {records.length ? (
-            <ProgressChart records={records} />
+          {scored.length ? (
+            <ProgressChart records={scored} />
           ) : (
             <EmptyState
               icon="chart"
@@ -249,7 +254,7 @@ export function ReportScreen() {
           })}
         </div>
       </section>
-      {records.length > 0 && (
+      {scored.length > 0 && (
         <section className="panel space-top">
           <h3>활동별 생각 기록</h3>
           <div className="table-wrap">
@@ -271,7 +276,7 @@ export function ReportScreen() {
                 </tr>
               </thead>
               <tbody>
-                {records.map((r) => (
+                {scored.map((r) => (
                   <tr key={r.id}>
                     <td>{r.date}</td>
                     <td>

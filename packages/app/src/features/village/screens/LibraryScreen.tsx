@@ -254,7 +254,7 @@ export function RecordDetailScreen() {
           <div className="stack">
             <section className="panel">
               <h3>이번 활동의 생각 발자국</h3>
-              <RubricBars rubric={record.rubric} />
+              {record.rubric && <RubricBars rubric={record.rubric} />}
               <Provenance mock={record.source === 'mock'} />
             </section>
             {record.story && (
@@ -354,7 +354,7 @@ export function CompleteScreen() {
         </span>
         <h2 className="space-top">{record.title}</h2>
         <div className="quote">{record.answers.at(-1)?.text}</div>
-        <RubricBars rubric={record.rubric} />
+        {record.rubric && <RubricBars rubric={record.rubric} />}
         <Provenance mock={record.source === 'mock'} />
         <div className="actions split">
           <Link to="/adventures" className="btn light">

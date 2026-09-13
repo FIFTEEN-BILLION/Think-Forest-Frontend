@@ -20,6 +20,7 @@ import { useVillage } from '../state/VillageProvider';
 import type { Draft } from '../types';
 import { useStepFocus } from '../lib/useStepFocus';
 import { InquiryScreen } from './InquiryScreen';
+import { ThinkingInquiryScreen } from './ThinkingInquiryScreen';
 
 export function SessionScreen() {
   const { data, parentUnlocked, storageError } = useVillage();
@@ -35,6 +36,9 @@ export function SessionScreen() {
       />
     );
   if (track !== d.track) return <Navigate to={`/session/${d.track}`} replace />;
+  if (d.activityId === 'first-inquiry' && d.thinking)
+    return <ThinkingInquiryScreen key={d.id} draft={d} />;
+  // Legacy v1 drafts saved before the thinking engine keep their original flow.
   if (d.activityId === 'first-inquiry' && d.inquiry) return <InquiryScreen key={d.id} draft={d} />;
   if (d.track === 'theater' && d.step <= 1 && !parentUnlocked)
     return <Navigate to="/parent-gate?next=%2Fsession%2Ftheater" replace />;

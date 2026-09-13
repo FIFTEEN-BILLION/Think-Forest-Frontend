@@ -1,16 +1,10 @@
 import { CATALOG, FORESTS } from '../data/catalog';
-import {
-  CONDITIONS,
-  JUDGMENTS,
-  emptyInquiry,
-  inquiryComplete,
-  inquiryGuard,
-  inquiryTransition,
-} from './inquiry';
+import { CONDITIONS, JUDGMENTS, inquiryComplete, inquiryGuard, inquiryTransition } from './inquiry';
 import {
   CHALLENGE_JUDGMENT_LABEL,
   PREDICTION_LABEL,
   deriveSkills,
+  emptyThinking,
   thinkingComplete,
   thinkingGuard,
   thinkingTransition,
@@ -138,7 +132,7 @@ export function createDraft(track: Track, activityId: string, min: number, keywo
     answers: [],
     followup: '',
     hints: 0,
-    ...(activityId === 'first-inquiry' ? { inquiry: emptyInquiry() } : {}),
+    ...(activityId === 'first-inquiry' ? { thinking: emptyThinking() } : {}),
     lab: {
       mode: activityId === 'balance' ? 'balance' : activityId === 'custom' ? 'custom' : 'shadow',
       topic: '',

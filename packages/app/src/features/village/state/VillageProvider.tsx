@@ -69,7 +69,6 @@ export function VillageProvider({ children }: PropsWithChildren) {
       toast('보호자와 함께 시작 안내를 먼저 확인해 주세요.');
       return null;
     }
-    if (track === 'theater' && !parentUnlocked) return null;
     const draft = createDraft(track, id, gateSize(current.current));
     update((prev) => ({ ...prev, resume: draft }));
     return draft;
@@ -78,14 +77,6 @@ export function VillageProvider({ children }: PropsWithChildren) {
     (event: LearningEvent) => {
       const draft = current.current.resume;
       if (!draft) return false;
-      if (
-        draft.track === 'theater' &&
-        (event.type === 'approve' || (event.type === 'advance' && draft.step <= 1)) &&
-        !parentUnlocked
-      ) {
-        toast('보호자가 먼저 확인해 주세요.');
-        return false;
-      }
       const result = transition(draft, event);
       if (result.error) {
         const kw = draft.track === 'theater' ? draft.theater.keyword : draft.lab.topic;
@@ -107,11 +98,9 @@ export function VillageProvider({ children }: PropsWithChildren) {
         return false;
       }
       update((p) => ({ ...p, resume: result.draft }));
-      if (draft.track === 'theater' && event.type === 'advance' && draft.step === 1)
-        setParentUnlocked(false);
       return true;
     },
-    [parentUnlocked, update],
+    [update],
   );
   const finish = () => {
     const draft = current.current.resume;
@@ -131,7 +120,6 @@ export function VillageProvider({ children }: PropsWithChildren) {
     }
   };
   const reset = () => {
-    if (!parentUnlocked) return false;
     try {
       const next = clearData();
       current.current = next;
@@ -146,7 +134,6 @@ export function VillageProvider({ children }: PropsWithChildren) {
     }
   };
   const restoreExamples = () => {
-    if (!parentUnlocked) return;
     update((p) => ({
       ...p,
       sessions: [...p.sessions.filter((s) => s.source === 'local'), ...mockSessions()],

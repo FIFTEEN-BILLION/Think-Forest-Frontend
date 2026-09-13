@@ -1,28 +1,15 @@
 import { useState } from 'react';
-import {
-  Link,
-  Navigate,
-  Outlet,
-  useLocation,
-  useNavigate,
-  useSearchParams,
-} from 'react-router-dom';
-import { GRADES, INTERESTS, PLACES } from '../data/catalog';
+import { Link, Navigate, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
+import { INTERESTS, PLACES } from '../data/catalog';
 import { useVillage } from '../state/VillageProvider';
 import { Icon } from '../components/Icon';
 import { Button, Notice, PageHeading, Provenance } from '../components/ui';
 import { safeNext } from '../lib/navigation';
 import { gateSize, localDate } from '../lib/learning';
-import type { Level, VillageData } from '../types';
+import type { VillageData } from '../types';
 
 export function ProtectedParentScreen() {
-  const { parentUnlocked } = useVillage();
-  const location = useLocation();
-  return parentUnlocked ? (
-    <Outlet />
-  ) : (
-    <Navigate replace to={`/parent-gate?next=${encodeURIComponent(location.pathname)}`} />
-  );
+  return <Outlet />;
 }
 export function ParentGateScreen() {
   const { parentUnlocked, setParentUnlocked } = useVillage();
@@ -102,7 +89,7 @@ export function ParentGateScreen() {
   );
 }
 export function ProfileScreen() {
-  const { data, update, toast, setParentUnlocked } = useVillage();
+  const { data, update, toast } = useVillage();
   const navigate = useNavigate();
   const [profile, setProfile] = useState(data.profile);
   const save = () => {
@@ -124,15 +111,9 @@ export function ProfileScreen() {
         title="아이의 속도로, 아이답게."
         description="아이의 관심사와 배움의 속도를 보호자와 함께 정해요."
       >
-        <Button
-          className="light small"
-          onClick={() => {
-            setParentUnlocked(false);
-            navigate('/');
-          }}
-        >
-          <Icon name="lock" />
-          보호자 화면 잠그기
+        <Button className="light small" onClick={() => navigate('/')}>
+          <Icon name="back" />
+          아이 화면으로 돌아가기
         </Button>
       </PageHeading>
       <div className="learning-grid">
@@ -157,16 +138,14 @@ export function ProfileScreen() {
             />
           </div>
           <div className="field">
-            <label htmlFor="profile-grade">학년</label>
-            <select
+            <label htmlFor="profile-grade">소속과 학년</label>
+            <input
               id="profile-grade"
               value={profile.grade}
+              placeholder="예: 새봄초등학교 2학년"
               onChange={(e) => setProfile((p) => ({ ...p, grade: e.target.value }))}
-            >
-              {GRADES.map((g) => (
-                <option key={g}>{g}</option>
-              ))}
-            </select>
+            />
+            <small>티키와의 첫 대화에서 학교와 학년을 자연스럽게 물어보고 자동으로 채워요.</small>
           </div>
           <fieldset className="interest-fieldset">
             <legend>좋아하는 것</legend>
@@ -214,32 +193,6 @@ export function ProfileScreen() {
           <h3>나에게 맞는 학습 설정</h3>
           <label className="setting-row">
             <span>
-              <strong>생각 문턱 자동 조절</strong>
-              <p>예시를 제외한 마지막 활동 점수로 정해요.</p>
-            </span>
-            <input
-              type="checkbox"
-              checked={data.settings.autoTune}
-              onChange={(e) => settings({ autoTune: e.target.checked })}
-            />
-          </label>
-          <div className="setting-row">
-            <div>
-              <strong>기본 글쓰기 단계</strong>
-              <p>쉬움 8자 · 보통 15자 · 도전 25자</p>
-            </div>
-            <select
-              aria-label="기본 글쓰기 단계"
-              value={data.settings.gate}
-              onChange={(e) => settings({ gate: e.target.value as Level })}
-            >
-              {['쉬움', '보통', '도전'].map((l) => (
-                <option key={l}>{l}</option>
-              ))}
-            </select>
-          </div>
-          <label className="setting-row">
-            <span>
               <strong>이야기 읽어 주기</strong>
               <p>기기에 설치된 한국어 음성을 사용해요.</p>
             </span>
@@ -278,8 +231,7 @@ export function ProfileScreen() {
             </select>
           </div>
           <Notice>
-            다음 모험의 글쓰기 문턱은 <strong>{gateSize(data)}자</strong>예요. 자동 조절을 끄면 기본
-            단계를 사용해요.
+            정해진 난이도나 글자 수 제한 없이, 아이가 원하는 만큼 자유롭게 말하고 쓸 수 있어요.
           </Notice>
           <div className="actions split">
             <Link

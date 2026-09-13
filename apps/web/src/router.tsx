@@ -33,6 +33,30 @@ export const router = createBrowserRouter([
       { path: 'adventures/:track', lazy: adventures },
       { path: 'adventures/:track/:activityId', lazy: adventures },
       {
+        path: 'talk',
+        lazy: async () => ({
+          Component: (await import('@jjcp/app/village/ConversationScreen')).ConversationScreen,
+        }),
+      },
+      {
+        path: 'first-talk',
+        lazy: async () => ({
+          Component: (await import('@jjcp/app/village/FirstTalkScreen')).FirstTalkScreen,
+        }),
+      },
+      {
+        path: 'words',
+        lazy: async () => ({
+          Component: (await import('@jjcp/app/village/WordsScreen')).WordsScreen,
+        }),
+      },
+      {
+        path: 'community',
+        lazy: async () => ({
+          Component: (await import('@jjcp/app/village/CommunityScreen')).CommunityScreen,
+        }),
+      },
+      {
         path: 'session/:track',
         lazy: async () => ({
           Component: (await import('@jjcp/app/village/SessionScreen')).SessionScreen,

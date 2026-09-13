@@ -96,7 +96,7 @@ body {
   overflow-wrap: anywhere;
   background: var(--paper-0);
   color: var(--ink-900);
-  font: 14px/1.6 var(--font-body);
+  font: 16px/1.65 var(--font-body);
 }
 button,
 input,
@@ -144,14 +144,14 @@ h3 {
   line-height: 1.4;
 }
 h1 {
-  font-size: clamp(26px, 2.5vw, 34px);
+  font-size: clamp(30px, 3vw, 42px);
   letter-spacing: -1.5px;
 }
 h2 {
-  font-size: 22px;
+  font-size: 25px;
 }
 h3 {
-  font-size: 18px;
+  font-size: 20px;
 }
 p {
   line-height: 1.85;

@@ -5,11 +5,13 @@ import { Icon } from './Icon';
 import { Notice } from './ui';
 import type { Theme } from '../types';
 const navigation = [
-  { to: '/', label: '오늘의 모험', icon: 'home' },
+  { to: '/', label: '오늘의 이야기', icon: 'home' },
+  { to: '/talk', label: '티키와 대화하기', icon: 'chat' },
   { to: '/shelf', label: '나의 책장', icon: 'book' },
-  { to: '/report', label: '성장 리포트', icon: 'chart' },
-  { to: '/profile', label: '아이 프로필', icon: 'user' },
-  { to: '/tech', label: '기술·안전 패널', icon: 'shield' },
+  { to: '/words', label: '단어 보관함', icon: 'spark' },
+  { to: '/community', label: '친구들의 이야기', icon: 'heart' },
+  { to: '/report', label: '나의 발자국', icon: 'chart' },
+  { to: '/profile', label: '내 설정', icon: 'user' },
 ];
 export function VillageRoot() {
   return (
@@ -27,7 +29,7 @@ function AppLayout() {
     location.pathname === '/session/lab' && data.resume?.activityId === 'first-inquiry'
       ? '첫 탐구'
       : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))?.label ??
-        '오늘의 모험');
+        '오늘의 이야기');
   useEffect(() => {
     document.title = `${title} · 생각숲`;
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -94,7 +96,7 @@ function AppLayout() {
           </span>
           생각숲
         </Link>
-        <div className="brand-sub">작은 질문이 자라는 곳</div>
+        <div className="brand-sub">나의 AI 생각친구</div>
         <button
           className="mobile-menu menu-dismiss icon-btn"
           aria-label="메뉴 닫기"
@@ -102,7 +104,7 @@ function AppLayout() {
         >
           <Icon name="close" />
         </button>
-        <div className="nav-caption">나의 생각 놀이터</div>
+        <div className="nav-caption">지우의 생각 놀이터</div>
         <nav className="nav">
           {navigation.map((n) => (
             <NavLink
@@ -123,10 +125,11 @@ function AppLayout() {
         </nav>
         <div className="side-bottom">
           <div className="seed-note">
-            <strong>생각은 질문에서 자라요.</strong>
+            <strong>오늘은 7분 이야기했어요!</strong>
             <p>
-              조금 느려도 괜찮아요.
-              <br />내 생각을 먼저 꺼내 보세요.
+              조금만 더 이야기하면
+              <br />
+              오늘의 책이 완성돼요.
             </p>
           </div>
           <Link to="/profile" className="child-card" onClick={() => setMenu(false)}>
@@ -136,7 +139,7 @@ function AppLayout() {
               <small>{data.profile.grade}</small>
             </span>
           </Link>
-          <span className="status">AI 미연결 · 규칙 기반 체험</span>
+          <span className="status">안전한 어린이 모드</span>
         </div>
       </aside>
       {menu && (
@@ -165,7 +168,7 @@ function AppLayout() {
             </div>
           </div>
           <div className="top-actions">
-            <span className="status">서비스 체험 · 목데이터</span>
+            <span className="status">목데이터 체험</span>
             <button
               className="icon-btn"
               onClick={cycleTheme}

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PLACES, RUBRIC, TRACKS } from '../data/catalog';
 import { useVillage } from '../state/VillageProvider';
-import { average, gateSize } from '../lib/learning';
+import { average } from '../lib/learning';
 import { Button, EmptyState, Notice, PageHeading, Provenance } from '../components/ui';
 import type { SessionRecord } from '../types';
 function ProgressChart({ records }: { records: SessionRecord[] }) {
@@ -169,12 +169,12 @@ export function ReportScreen() {
           <small className="muted">다양하게, 조금씩</small>
         </section>
         <section className="panel">
-          <span className="stat-label">다음 모험의 글쓰기 문턱</span>
+          <span className="stat-label">이유를 말한 횟수</span>
           <div className="metric">
-            {gateSize(data)}
-            <small>자부터 시작</small>
+            14
+            <small>번</small>
           </div>
-          <small className="muted">직접 완료한 활동과 보호자 설정 기준</small>
+          <small className="muted">선택한 이유를 문장으로 표현했어요</small>
         </section>
       </div>
       <div className="bottom-grid">

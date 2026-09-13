@@ -129,7 +129,7 @@ export function initialData(withExamples = true): VillageData {
     version: 1,
     profile: {
       name: '지우',
-      grade: '초등학교 1학년',
+      grade: '새봄초등학교 2학년',
       interests: ['공룡', '동물', '우주'],
       goal: '내 생각의 이유를 말하는 힘',
     },

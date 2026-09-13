@@ -65,6 +65,21 @@ const paths: Record<string, ReactNode> = {
       <path d="M12 6v6l4 3" />
     </>
   ),
+  mic: (
+    <>
+      <rect x="9" y="3" width="6" height="11" rx="3" />
+      <path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8" />
+    </>
+  ),
+  share: (
+    <>
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <path d="m9 10 6-3M9 14l6 3" />
+    </>
+  ),
+  plus: <path d="M12 5v14M5 12h14" />,
 };
 export function Icon({ name, className = '' }: { name: string; className?: string }) {
   return (

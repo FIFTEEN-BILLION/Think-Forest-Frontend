@@ -22,7 +22,7 @@ import { useStepFocus } from '../lib/useStepFocus';
 import { InquiryScreen } from './InquiryScreen';
 
 export function SessionScreen() {
-  const { data, parentUnlocked, storageError } = useVillage();
+  const { data, storageError } = useVillage();
   const { track } = useParams();
   const d = data.resume;
   useStepFocus(d?.step);
@@ -36,8 +36,6 @@ export function SessionScreen() {
     );
   if (track !== d.track) return <Navigate to={`/session/${d.track}`} replace />;
   if (d.activityId === 'first-inquiry' && d.inquiry) return <InquiryScreen key={d.id} draft={d} />;
-  if (d.track === 'theater' && d.step <= 1 && !parentUnlocked)
-    return <Navigate to="/parent-gate?next=%2Fsession%2Ftheater" replace />;
   return (
     <>
       <div className="row between wrap">

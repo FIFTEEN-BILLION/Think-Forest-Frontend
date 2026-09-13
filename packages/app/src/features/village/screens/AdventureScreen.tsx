@@ -14,7 +14,6 @@ import {
 import { Icon } from '../components/Icon';
 import { ForestArt, VillageArt } from '../components/Artwork';
 import { StageArt } from '../components/Simulation';
-import { gateSize } from '../lib/learning';
 import type { Track } from '../types';
 import { INQUIRY_STEPS } from '../lib/inquiry';
 const stepDescriptions: Record<Track, string[]> = {
@@ -49,7 +48,7 @@ export function AdventureScreen() {
       ? '?preview=connection-error'
       : '';
   const [search, setSearch] = useState('');
-  const { data, start, parentUnlocked } = useVillage();
+  const { data, start } = useVillage();
   const navigate = useNavigate();
   const selectedTrack = TRACKS.includes(track as Track) ? (track as Track) : null;
   const activity = CATALOG.find((a) => a.id === activityId && a.track === track);
@@ -62,10 +61,6 @@ export function AdventureScreen() {
     const next = `/adventures/${activity.track}/${activity.id}${preview}`;
     if (!data.consent.done) {
       navigate(`/onboarding?next=${encodeURIComponent(next)}`);
-      return;
-    }
-    if (activity.track === 'theater' && !parentUnlocked) {
-      navigate(`/parent-gate?next=${encodeURIComponent(next)}`);
       return;
     }
     const draft = start(activity.track, activity.id);
@@ -100,7 +95,6 @@ export function AdventureScreen() {
                   {PLACES[activity.track].name}
                 </span>
                 <span className="tag">약 {activity.duration}분</span>
-                <span className="tag">{activity.level}</span>
               </div>
               <h2 className="space-top">{activity.subtitle}</h2>
               <p>{activity.description}</p>
@@ -139,10 +133,7 @@ export function AdventureScreen() {
                 있어요. 실제 AI 호출은 없어요.
               </Notice>
             )}
-            <Notice>
-              이번 모험의 글쓰기 문턱은 <strong>{gateSize(data)}자</strong>예요. 모험 중에는 문턱이
-              바뀌지 않아요.
-            </Notice>
+            <Notice>정해진 난이도는 없어요. 네 속도대로 자유롭게 오래 말해도 좋아요.</Notice>
             {data.resume ? (
               <>
                 <Notice>
@@ -227,9 +218,7 @@ export function AdventureScreen() {
               </div>
               <h3 className="space-top">{a.subtitle}</h3>
               <p>{a.description}</p>
-              <small className="muted">
-                약 {a.duration}분 · {a.level} · 규칙 기반 체험
-              </small>
+              <small className="muted">약 {Math.max(15, a.duration)}분 · 자유롭게 이야기해요</small>
               <Link className="btn light" to={`/adventures/${a.track}/${a.id}`}>
                 모험 자세히 보기
                 <Icon name="arrow" />

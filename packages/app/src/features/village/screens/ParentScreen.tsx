@@ -1,92 +1,14 @@
 import { useState } from 'react';
-import { Link, Navigate, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { INTERESTS, PLACES } from '../data/catalog';
 import { useVillage } from '../state/VillageProvider';
 import { Icon } from '../components/Icon';
 import { Button, Notice, PageHeading, Provenance } from '../components/ui';
-import { safeNext } from '../lib/navigation';
 import { gateSize, localDate } from '../lib/learning';
 import type { VillageData } from '../types';
 
 export function ProtectedParentScreen() {
   return <Outlet />;
-}
-export function ParentGateScreen() {
-  const { parentUnlocked, setParentUnlocked } = useVillage();
-  const [params] = useSearchParams();
-  const next = safeNext(params.get('next'), '/profile');
-  const navigate = useNavigate();
-  const [problem] = useState(() => ({
-    a: Math.floor(Math.random() * 8) + 5,
-    b: Math.floor(Math.random() * 8) + 4,
-  }));
-  const [answer, setAnswer] = useState('');
-  const [error, setError] = useState(false);
-  if (parentUnlocked) return <Navigate to={next} replace />;
-  const verify = () => {
-    if (!answer.trim() || Number(answer) !== problem.a + problem.b) {
-      setError(true);
-      return;
-    }
-    setParentUnlocked(true);
-    navigate(next, { replace: true });
-  };
-  return (
-    <div className="center">
-      <PageHeading
-        eyebrow="A MOMENT WITH YOUR GUARDIAN"
-        title="보호자와 함께 열어 주세요."
-        description="아이의 설정과 기록을 살펴보는 공간이에요."
-      />
-      <section className="panel">
-        <div className="success-mark">
-          <Icon name="lock" />
-        </div>
-        <h2 className="text-center">잠깐, 보호자에게 부탁해요.</h2>
-        <p className="muted text-center space-top">아래 계산 결과를 적어 주세요.</p>
-        <div className="math-question">
-          {problem.a} + {problem.b} = ?
-        </div>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            verify();
-          }}
-        >
-          <div className="field">
-            <label htmlFor="guardian-answer">계산 결과</label>
-            <input
-              id="guardian-answer"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              inputMode="numeric"
-              autoComplete="off"
-              aria-invalid={error}
-              aria-describedby={error ? 'gate-error' : undefined}
-              placeholder="결과를 적어 주세요"
-            />
-          </div>
-          {error && (
-            <p id="gate-error" className="field-error" role="alert">
-              한 번 더 계산해 주세요.
-            </p>
-          )}
-          <Notice>
-            서비스 체험을 위한 화면 잠금이에요. 실제 보호자 본인 인증이나 보안 기능은 아니에요.
-          </Notice>
-          <div className="actions split">
-            <Link to="/" className="btn light">
-              마을로 돌아가기
-            </Link>
-            <button className="btn" type="submit">
-              보호자 화면 열기
-              <Icon name="arrow" />
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
-  );
 }
 export function ProfileScreen() {
   const { data, update, toast } = useVillage();
@@ -234,14 +156,8 @@ export function ProfileScreen() {
             정해진 난이도나 글자 수 제한 없이, 아이가 원하는 만큼 자유롭게 말하고 쓸 수 있어요.
           </Notice>
           <div className="actions split">
-            <Link
-              className="btn light"
-              to="/diagnosis"
-              onClick={() =>
-                update((p) => ({ ...p, diagnosticDraft: { index: 0, answers: ['', '', ''] } }))
-              }
-            >
-              시작 단계 다시 찾기
+            <Link className="btn light" to="/first-talk">
+              티키와 다시 인사하기
             </Link>
             <Link className="btn ghost" to="/data">
               기록 열람·삭제
@@ -262,8 +178,8 @@ export function ProfileScreen() {
           <dt>외부 AI 전송</dt>
           <dd>사용하지 않음</dd>
         </dl>
-        <Link className="btn light small" to="/welcome">
-          아이용 이용 안내 다시 보기
+        <Link className="btn light small" to="/first-talk">
+          아이 프로필 다시 이야기하기
         </Link>
       </section>
     </>
@@ -365,7 +281,7 @@ export function TechScreen() {
             <dt>읽어 주기</dt>
             <dd>설치된 로컬 한국어 음성이 있을 때 사용해요.</dd>
             <dt>보호자 확인</dt>
-            <dd>체험용 산수 화면 잠금 · 실제 인증 아님</dd>
+            <dd>잠금 없음 · 실제 서비스에서는 연결 계정 권한으로 분리 예정</dd>
             <dt>결제·계정</dt>
             <dd>미연결 · 무료 로컬 체험</dd>
           </dl>
@@ -558,7 +474,7 @@ export function DataScreen() {
                     disabled={word.trim() !== '삭제'}
                     onClick={() => {
                       if (word.trim() === '삭제' && reset())
-                        navigate('/welcome', { replace: true });
+                        navigate('/first-talk', { replace: true });
                     }}
                   >
                     전체 기록 영구 삭제

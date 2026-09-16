@@ -6,12 +6,10 @@ import { Notice } from './ui';
 import type { Theme } from '../types';
 const navigation = [
   { to: '/', label: '오늘의 이야기', icon: 'home' },
-  { to: '/talk', label: '티키와 대화하기', icon: 'chat' },
   { to: '/shelf', label: '나의 책장', icon: 'book' },
   { to: '/words', label: '단어 보관함', icon: 'spark' },
   { to: '/community', label: '친구들의 이야기', icon: 'heart' },
   { to: '/report', label: '나의 발자국', icon: 'chart' },
-  { to: '/profile', label: '내 설정', icon: 'user' },
 ];
 export function VillageRoot() {
   return (
@@ -28,8 +26,20 @@ function AppLayout() {
   const title =
     location.pathname === '/session/lab' && data.resume?.activityId === 'first-inquiry'
       ? '첫 탐구'
-      : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))?.label ??
-        '오늘의 이야기');
+      : location.pathname.startsWith('/first-talk')
+        ? '티키와 첫 인사'
+        : location.pathname.startsWith('/talk')
+          ? '티키와 대화하기'
+          : location.pathname.startsWith('/topics/new')
+            ? '내가 주제 정하기'
+            : location.pathname.startsWith('/story-share')
+              ? '내 이야기 공유하기'
+              : location.pathname.startsWith('/profile')
+                ? '내 프로필과 설정'
+                : location.pathname.startsWith('/data')
+                  ? '내 기록 관리'
+                  : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))
+                      ?.label ?? '오늘의 이야기');
   useEffect(() => {
     document.title = `${title} · 생각숲`;
     window.scrollTo({ top: 0, behavior: 'instant' });

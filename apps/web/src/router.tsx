@@ -2,8 +2,8 @@ import { createBrowserRouter } from 'react-router-dom';
 import { HomeScreen, NotFoundScreen, VillageRoot } from '@jjcp/app/screens';
 
 const parent = () => import('@jjcp/app/village/ParentScreen');
-const onboarding = () => import('@jjcp/app/village/OnboardingScreen');
 const library = () => import('@jjcp/app/village/LibraryScreen');
+const experience = () => import('@jjcp/app/village/ExperienceScreen');
 const adventures = async () => ({
   Component: (await import('@jjcp/app/village/AdventureScreen')).AdventureScreen,
 });
@@ -20,15 +20,6 @@ export const router = createBrowserRouter([
     ErrorBoundary: NotFoundScreen,
     children: [
       { index: true, Component: HomeScreen },
-      { path: 'welcome', lazy: async () => ({ Component: (await onboarding()).WelcomeScreen }) },
-      {
-        path: 'onboarding',
-        lazy: async () => ({ Component: (await onboarding()).OnboardingScreen }),
-      },
-      {
-        path: 'diagnosis/:mode?',
-        lazy: async () => ({ Component: (await onboarding()).DiagnosisScreen }),
-      },
       { path: 'adventures', lazy: adventures },
       { path: 'adventures/:track', lazy: adventures },
       { path: 'adventures/:track/:activityId', lazy: adventures },
@@ -57,6 +48,18 @@ export const router = createBrowserRouter([
         }),
       },
       {
+        path: 'community/:id',
+        lazy: async () => ({ Component: (await experience()).CommunityStoryScreen }),
+      },
+      {
+        path: 'story-share',
+        lazy: async () => ({ Component: (await experience()).ShareStoryScreen }),
+      },
+      {
+        path: 'topics/new',
+        lazy: async () => ({ Component: (await experience()).CustomTopicScreen }),
+      },
+      {
         path: 'session/:track',
         lazy: async () => ({
           Component: (await import('@jjcp/app/village/SessionScreen')).SessionScreen,
@@ -74,7 +77,6 @@ export const router = createBrowserRouter([
           Component: (await import('@jjcp/app/village/ReportScreen')).ReportScreen,
         }),
       },
-      { path: 'parent-gate', lazy: async () => ({ Component: (await parent()).ParentGateScreen }) },
       {
         lazy: async () => ({ Component: (await parent()).ProtectedParentScreen }),
         children: [

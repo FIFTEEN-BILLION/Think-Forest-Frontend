@@ -6,12 +6,10 @@ import { useVillage } from '../state/VillageProvider';
 
 export function HomeScreen() {
   const { data, toast } = useVillage();
-  const [categories, setCategories] = useState(['오늘', '과학', '수학', '역사', '상상', '내 일상']);
+  const [categories] = useState(['오늘', '과학', '수학', '역사', '상상', '내 일상']);
   const [active, setActive] = useState('오늘');
   const addCategory = () => {
-    if (!categories.includes('공룡')) setCategories([...categories, '공룡']);
-    setActive('공룡');
-    toast('지우가 좋아하는 ‘공룡’ 카테고리를 추가했어요!');
+    toast('직접 이야기할 주제를 만들어 볼까요?');
   };
   return (
     <>
@@ -91,9 +89,9 @@ export function HomeScreen() {
             {category}
           </button>
         ))}
-        <button className="chip add-category" onClick={addCategory}>
+        <Link className="chip add-category" to="/topics/new" onClick={addCategory}>
           <Icon name="plus" /> 내 주제 추가
-        </button>
+        </Link>
       </div>
 
       <div className="section-title">
@@ -167,7 +165,7 @@ export function HomeScreen() {
         </div>
         <div className="home-story-grid">
           {COMMUNITY_STORIES.map((story, index) => (
-            <Link to="/community" className="home-story-card" key={story.id}>
+            <Link to={`/community/${story.id}`} className="home-story-card" key={story.id}>
               <div className="home-story-art">
                 <span>{story.emoji}</span>
                 <small>{story.category}</small>

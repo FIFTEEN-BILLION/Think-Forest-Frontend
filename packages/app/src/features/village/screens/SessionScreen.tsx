@@ -26,7 +26,7 @@ export function SessionScreen() {
   const { track } = useParams();
   const d = data.resume;
   useStepFocus(d?.step);
-  if (!data.consent.done) return <Navigate to="/onboarding" replace />;
+  if (!data.consent.done) return <Navigate to="/first-talk" replace />;
   if (!d)
     return (
       <EmptyState

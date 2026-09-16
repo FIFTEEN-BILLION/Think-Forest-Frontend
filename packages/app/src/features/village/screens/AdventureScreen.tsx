@@ -60,7 +60,7 @@ export function AdventureScreen() {
     if (!activity) return;
     const next = `/adventures/${activity.track}/${activity.id}${preview}`;
     if (!data.consent.done) {
-      navigate(`/onboarding?next=${encodeURIComponent(next)}`);
+      navigate(`/first-talk?next=${encodeURIComponent(next)}`);
       return;
     }
     const draft = start(activity.track, activity.id);

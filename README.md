@@ -1,4 +1,4 @@
-# 생각숲 · JJCP
+# 우리 아이 생각친구, 티키 · JJCP
 
 npm workspaces 기반의 Vite 웹 + Expo React Native WebView 모노레포입니다.
 `legacy/v2/index.html`의 디자인과 기능을 화면별 React 컴포넌트로 구현했습니다.
@@ -15,7 +15,7 @@ packages/
     api/               # HTTP 클라이언트, TanStack Query 설정
     components/        # @emotion/native 공통 UI
     hooks/             # 공통 훅
-    features/village/  # 생각숲 화면, UI, 목데이터, 학습 상태 로직
+    features/village/  # 우리 아이 생각친구, 티키 화면, UI, 목데이터, 학습 상태 로직
     native/            # WebView 셸, 로딩/오류 처리, Android 뒤로 가기
     providers/         # ThemeProvider, QueryClientProvider
     screens/           # 실제 화면
@@ -25,7 +25,7 @@ legacy/                # Git, 린트, 포맷 대상에서 제외
 ```
 
 화면과 비즈니스 로직은 `packages/app/src`에 작성합니다. `apps/web/src/router.tsx`는
-공통 화면을 가져와 경로만 연결하고 화면 묶음을 지연 로딩합니다. 생각숲은
+공통 화면을 가져와 경로만 연결하고 화면 묶음을 지연 로딩합니다. 우리 아이 생각친구, 티키는
 시맨틱 HTML 기반 React 컴포넌트와 CSS를 사용합니다. 기존 `react-native-web` 매핑과
 `@emotion/native` 공통 컴포넌트는 유지합니다.
 
@@ -99,7 +99,7 @@ npm run ios            # Expo + iOS 실행 (macOS)
 | `/tech`                             | AI 연결·검수 현황, 차단 규칙, 안전 로그                         |
 | `/data`                             | 기록 열람·JSON 다운로드·예시 채우기·전체 삭제                   |
 
-- 생각숲: 이야기 → 첫 문장 → 새 단서와 문장 → 생각 정리 → 돌아보기.
+- 우리 아이 생각친구, 티키: 이야기 → 첫 문장 → 새 단서와 문장 → 생각 정리 → 돌아보기.
 - 실험실: 준비 → 예상 쓰기 → 두 조건 관찰 → 설명 쓰기 → 다시 생각하기 → 돌아보기.
   그림자와 저울은 값을 움직이는 시뮬레이션입니다. 자유 주제는 지원되는 주제에 맞춰
   시뮬레이션을 연결하거나 두 관찰을 직접 기록하는 노트를 제공합니다.
@@ -145,7 +145,7 @@ npm run ios            # Expo + iOS 실행 (macOS)
 명시되며 직접 작성한 기록만 볼 수도 있습니다.
 
 `VillageProvider`가 화면에서 공유하는 상태와 저장을 담당합니다. 저장 키는
-`jaram_village_react_v1`이며 서비스 이름을 생각숲으로 바꾼 뒤에도 기존 기록을 보존하기 위해 유지합니다. 기존 HTML의 저장소와는 분리되어 있습니다. 입력 중인 문장,
+`jaram_village_react_v1`이며 서비스 이름 변경 뒤에도 기존 기록을 보존하기 위해 유지합니다. 기존 HTML의 저장소와는 분리되어 있습니다. 입력 중인 문장,
 학습 단계, 시작 안내, 진단 응답을 복원합니다. 기본 보관기간은 90일이고 다음 로드 시
 기간이 지난 기록을 정리합니다. 저장 실패는 화면에 알립니다. 전체 삭제 후 다시
 접속해도 예시 기록을 자동으로 되살리지 않습니다. 기록 관리에서 다시 채울 수 있습니다.
@@ -192,5 +192,5 @@ export function useItems() {
 보고됩니다. 자동 수정 제안은 Expo 46으로의 다운그레이드를 포함하므로 적용하지
 않았습니다. Expo의 호환 가능한 업데이트에서 해결 여부를 확인해야 합니다.
 
-생각숲 화면은 경로별로 지연 로딩합니다.
+우리 아이 생각친구, 티키 화면은 경로별로 지연 로딩합니다.
 네이티브 번들 생성 검사는 실제 기기에서의 WebView 실행 검증을 대신하지 않습니다.

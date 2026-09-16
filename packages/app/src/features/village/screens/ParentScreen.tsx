@@ -361,7 +361,7 @@ export function DataScreen() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `생각숲_기록_${localDate()}.json`;
+    a.download = `우리_아이_생각친구_티키_기록_${localDate()}.json`;
     document.body.appendChild(a);
     a.click();
     a.remove();

@@ -2,7 +2,7 @@ import type { CatalogActivity, Track } from '../types';
 
 export const PLACES = {
   forest: {
-    name: '생각숲',
+    name: '우리 아이 생각친구, 티키',
     area: '사고력',
     color: 'violet',
     icon: 'tree',

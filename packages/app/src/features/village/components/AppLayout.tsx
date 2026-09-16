@@ -41,7 +41,7 @@ function AppLayout() {
                   : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))
                       ?.label ?? '오늘의 이야기');
   useEffect(() => {
-    document.title = `${title} · 생각숲`;
+    document.title = `${title} · 우리 아이 생각친구, 티키`;
     window.scrollTo({ top: 0, behavior: 'instant' });
     document.getElementById('main')?.focus({ preventScroll: true });
     window.speechSynthesis?.cancel();
@@ -104,9 +104,12 @@ function AppLayout() {
           <span className="brandmark">
             <Icon name="sprout" />
           </span>
-          생각숲
+          <span className="brand-copy">
+            <small>우리 아이 생각친구,</small>
+            <strong>티키</strong>
+          </span>
         </Link>
-        <div className="brand-sub">나의 AI 생각친구</div>
+        <div className="brand-sub">말하고 생각하며 자라는 시간</div>
         <button
           className="mobile-menu menu-dismiss icon-btn"
           aria-label="메뉴 닫기"

@@ -14,7 +14,7 @@ export const router = createBrowserRouter([
     Component: VillageRoot,
     hydrateFallbackElement: (
       <div className="route-loading" role="status">
-        생각숲을 열고 있어요…
+        우리 아이 생각친구, 티키를 열고 있어요…
       </div>
     ),
     ErrorBoundary: NotFoundScreen,

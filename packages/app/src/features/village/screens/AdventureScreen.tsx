@@ -16,6 +16,7 @@ import { ForestArt, VillageArt } from '../components/Artwork';
 import { StageArt } from '../components/Simulation';
 import type { Track } from '../types';
 import { THINKING_STEPS, THINKING_STEP_HINTS } from '../lib/thinking';
+import { PATH_STEPS, PATH_STEP_HINTS } from '../lib/path';
 const stepDescriptions: Record<Track, string[]> = {
   forest: [
     '이야기를 읽고 눈에 보이는 단서를 살펴봐요.',
@@ -107,7 +108,9 @@ export function AdventureScreen() {
             <ol className="journey-list">
               {(activity.id === 'first-inquiry'
                 ? THINKING_STEPS
-                : PLACES[activity.track].steps
+                : activity.id === 'path-teaching'
+                  ? PATH_STEPS
+                  : PLACES[activity.track].steps
               ).map((s, i) => (
                 <li key={s}>
                   <span>{String(i + 1).padStart(2, '0')}</span>
@@ -116,7 +119,9 @@ export function AdventureScreen() {
                     <small>
                       {activity.id === 'first-inquiry'
                         ? THINKING_STEP_HINTS[i]
-                        : stepDescriptions[activity.track][i]}
+                        : activity.id === 'path-teaching'
+                          ? PATH_STEP_HINTS[i]
+                          : stepDescriptions[activity.track][i]}
                     </small>
                   </div>
                 </li>

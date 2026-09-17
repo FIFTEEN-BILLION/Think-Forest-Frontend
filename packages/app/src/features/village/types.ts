@@ -108,6 +108,92 @@ export interface ThinkingInquiry {
   skills: SkillResult[];
 }
 
+// Path teaching: the child teaches 티키 by talking. 티키 (AI) turns the words into a literal
+// program; a deterministic engine runs it. AI never plans the path or invents the result.
+export type Sensor = 'front' | 'left' | 'right';
+export type SensorState = 'open' | 'blocked';
+export type Heading = 'up' | 'right' | 'down' | 'left';
+export type PathOutcome = 'arrived' | 'splashed' | 'bumped' | 'ended' | 'loop' | 'tooLong';
+export type PathSkillId = 'predict' | 'precise' | 'revise' | 'challenge' | 'generalize';
+export interface LeafStep {
+  op: 'move' | 'turn' | 'stop';
+  count: number | null;
+  until: 'blocked' | null;
+  dir: 'left' | 'right' | null;
+}
+export interface InnerStep extends Omit<LeafStep, 'op'> {
+  op: LeafStep['op'] | 'if';
+  sensor: Sensor | null;
+  state: SensorState | null;
+  then: LeafStep[];
+  else: LeafStep[];
+}
+export interface ProgramStep extends Omit<InnerStep, 'op'> {
+  op: InnerStep['op'] | 'repeat';
+  body: InnerStep[];
+}
+export interface PathMap {
+  id: string;
+  puddles: number[];
+  start: number;
+  heading: Heading;
+  goal: number;
+}
+export interface HeardPhrase {
+  phrase: string;
+  meaning: string;
+}
+export type PathTurnKind = 'program' | 'clarify' | 'unmapped';
+export interface PathTurn {
+  id: string;
+  text: string;
+  origin: InputOrigin;
+  kind: PathTurnKind;
+  heard: HeardPhrase[];
+  tikiLine: string;
+  source: AiSource;
+  clarify: { question: string; options: { label: string; program: ProgramStep[] }[] } | null;
+  chosen: string | null;
+}
+export interface PathRun {
+  id: string;
+  // How many chat turns existed when this run started; orders runs inside the chat.
+  afterTurn: number;
+  map: PathMap;
+  program: ProgramStep[];
+  cells: number[];
+  outcome: PathOutcome;
+  // Human label of the step 티키 was doing when it stopped, e.g. "2번째 말: 쭉 앞으로".
+  stopLabel: string | null;
+  predicted: number | null;
+  help: number;
+  reaction: {
+    tikiLine: string;
+    question: string | null;
+    source: AiSource;
+    challengeLine: string | null;
+  } | null;
+}
+export interface PathSkillResult {
+  skill: PathSkillId;
+  level: SkillLevel;
+  quote: string;
+}
+export interface PathInquiry {
+  version: 1;
+  program: ProgramStep[];
+  turns: PathTurn[];
+  runs: PathRun[];
+  // Maps in play: the first delivery, then the challenge maps 티키 picked.
+  maps: PathMap[];
+  wins: number;
+  awaitingChallenge: boolean;
+  noChallengeLeft: boolean;
+  prediction: number | null;
+  help: number;
+  skills: PathSkillResult[];
+}
+
 export interface Draft {
   id: string;
   track: Track;
@@ -123,6 +209,7 @@ export interface Draft {
   hints: number;
   inquiry?: Inquiry;
   thinking?: ThinkingInquiry;
+  path?: PathInquiry;
   lab: {
     mode: LabMode;
     topic: string;
@@ -155,7 +242,7 @@ export interface SessionRecord {
   source: Provenance;
   text: string;
   answers: Answer[];
-  // Absent for first inquiry v2 records: they show thinking skills, never scores.
+  // Absent for first inquiry v2 and path records: they show thinking skills, never scores.
   rubric?: Rubric;
   story?: Story;
   emotion?: string;
@@ -164,6 +251,7 @@ export interface SessionRecord {
   favorite: boolean;
   inquiry?: Inquiry;
   thinking?: ThinkingInquiry;
+  path?: PathInquiry;
 }
 
 export interface Diagnosis {
@@ -262,6 +350,20 @@ export type LearningEvent =
   | { type: 'think-challenge-judge'; judgment: ChallengeJudgment }
   | { type: 'think-challenge-reason'; value: string }
   | { type: 'think-challenge-observe' }
+  | { type: 'path-teach'; turn: PathTurn; program: ProgramStep[] | null }
+  | { type: 'path-clarify'; turnId: string; label: string; program: ProgramStep[] }
+  | { type: 'path-reset' }
+  | { type: 'path-predict'; cell: number | null }
+  | { type: 'path-run' }
+  | { type: 'path-help' }
+  | {
+      type: 'path-react';
+      runId: string;
+      tikiLine: string;
+      question: string | null;
+      source: AiSource;
+      challenge: { map: PathMap; line: string } | null;
+    }
   | { type: 'text'; text: string }
   | { type: 'hint' }
   | { type: 'advance' }

@@ -3788,3 +3788,88 @@ select {
   opacity: 0.6;
   cursor: progress;
 }
+
+/* 티키와 이야기 (서버 대화) ------------------------------------------------- */
+.talk-picker .conversation-head {
+  grid-template-columns: auto 1fr;
+  margin-bottom: 22px;
+}
+.talk-picker-title h1 {
+  margin: 2px 0 0;
+  font-size: 24px;
+  word-break: keep-all;
+}
+.resume-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 28px;
+}
+.resume-list h2 {
+  margin: 0 0 4px;
+  font-size: 19px;
+}
+.resume-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--paper-1);
+}
+.resume-row > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.topic-emoji-small {
+  font-size: 30px;
+}
+button.topic-card {
+  width: 100%;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+button.topic-card:disabled {
+  cursor: progress;
+  opacity: 0.7;
+}
+.dimension-status {
+  width: auto;
+  margin: 16px 20px;
+}
+.chat-notice {
+  padding: 10px 19px 0;
+}
+.cancel-confirm {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--ink-700);
+}
+.story-body p {
+  margin-top: 12px;
+  line-height: 1.9;
+}
+.journey-list {
+  margin-top: 18px;
+}
+.journey-list ul {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  color: var(--ink-700);
+}
+@media (max-width: 640px) {
+  .resume-row {
+    grid-template-columns: auto 1fr;
+  }
+  .resume-row .btn {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+}

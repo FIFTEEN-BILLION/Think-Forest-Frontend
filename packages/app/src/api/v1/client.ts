@@ -52,7 +52,7 @@ export function parseV1Error(status: number, bodyText: string, headerRequestId?:
   return new V1Error(status, code, message, details, requestId);
 }
 
-export function newIdempotencyKey() {
+export function newIdempotencyKey(): string {
   return globalThis.crypto.randomUUID();
 }
 

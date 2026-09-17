@@ -1,7 +1,15 @@
 import { initialData } from '../data/mock';
 import { CATALOG } from '../data/catalog';
 import { VARIABLE_ORDER, isSetup } from './shadow';
-import type { Draft, Inquiry, SessionRecord, ThinkingInquiry, VillageData } from '../types';
+import { isMap, isProgram } from './path';
+import type {
+  Draft,
+  Inquiry,
+  PathInquiry,
+  SessionRecord,
+  ThinkingInquiry,
+  VillageData,
+} from '../types';
 
 export const STORAGE_KEY = 'jaram_village_react_v1';
 const object = (v: unknown): v is Record<string, unknown> =>
@@ -127,6 +135,49 @@ export function isThinking(v: unknown): v is ThinkingInquiry {
         isSetup(ch.compare)))
   );
 }
+const outcomes = ['arrived', 'splashed', 'bumped', 'ended', 'loop', 'tooLong'];
+const sources = ['ai', 'fallback'];
+export function isPathInquiry(v: unknown): v is PathInquiry {
+  return (
+    object(v) &&
+    v.version === 1 &&
+    isProgram(v.program) &&
+    Array.isArray(v.maps) &&
+    v.maps.length >= 1 &&
+    v.maps.every(isMap) &&
+    like({ wins: 0, awaitingChallenge: false, noChallengeLeft: false, help: 0 }, v) &&
+    (v.prediction === null || (Number.isInteger(v.prediction) && Number(v.prediction) < 25)) &&
+    Array.isArray(v.skills) &&
+    Array.isArray(v.turns) &&
+    v.turns.every(
+      (t) =>
+        object(t) &&
+        like({ id: '', text: '', tikiLine: '' }, t) &&
+        ['program', 'clarify', 'unmapped'].includes(String(t.kind)) &&
+        sources.includes(String(t.source)) &&
+        Array.isArray(t.heard) &&
+        (t.chosen === null || typeof t.chosen === 'string'),
+    ) &&
+    Array.isArray(v.runs) &&
+    v.runs.every(
+      (r) =>
+        object(r) &&
+        like({ id: '', help: 0, afterTurn: 0 }, r) &&
+        isMap(r.map) &&
+        isProgram(r.program) &&
+        Array.isArray(r.cells) &&
+        outcomes.includes(String(r.outcome)) &&
+        (r.reaction === null || (object(r.reaction) && typeof r.reaction.tikiLine === 'string')),
+    )
+  );
+}
+// Each activity owns exactly one progress shape; the others must be absent.
+function activityShape(v: Record<string, unknown>) {
+  if (v.activityId === 'first-inquiry') return v.path === undefined && firstInquiry(v);
+  if (v.activityId === 'path-teaching')
+    return v.inquiry === undefined && v.thinking === undefined && isPathInquiry(v.path);
+  return v.inquiry === undefined && v.thinking === undefined && v.path === undefined;
+}
 function firstInquiry(v: Record<string, unknown>) {
   return v.thinking === undefined
     ? isInquiry(v.inquiry)
@@ -148,14 +199,13 @@ export function isDraft(v: unknown): v is Draft {
     ![8, 15, 25].includes(Number(v.min)) ||
     !Number.isInteger(v.step) ||
     Number(v.step) < 0 ||
-    Number(v.step) > (v.track === 'lab' ? 5 : 4)
+    Number(v.step) > (v.activityId === 'path-teaching' ? 1 : v.track === 'lab' ? 5 : 4)
   )
     return false;
   const t = v.theater;
   return (
-    (v.activityId === 'first-inquiry'
-      ? firstInquiry(v) && Number(v.step) <= 4
-      : v.inquiry === undefined && v.thinking === undefined) &&
+    activityShape(v) &&
+    !(v.activityId === 'first-inquiry' && Number(v.step) > 4) &&
     like({ keyword: '', scene: 0, emotion: '', approved: false }, t) &&
     [0, 1, 2, 3].includes(Number(t.scene)) &&
     [null, 0, 1].includes(t.choice as null | number) &&
@@ -173,7 +223,7 @@ export function isSession(v: unknown): v is SessionRecord {
     CATALOG.some((a) => a.id === v.activityId && a.track === v.track) &&
     answers(v.answers) &&
     // Thinking-skill records have no score; every other record keeps its rubric.
-    (v.thinking !== undefined
+    (v.thinking !== undefined || v.path !== undefined
       ? v.rubric === undefined
       : object(v.rubric) &&
         ['observe', 'reason', 'express'].every(
@@ -183,9 +233,7 @@ export function isSession(v: unknown): v is SessionRecord {
             Number((v.rubric as Record<string, unknown>)[k]) <= 100,
         )) &&
     (v.story === undefined || story(v.story)) &&
-    (v.activityId === 'first-inquiry'
-      ? firstInquiry(v)
-      : v.inquiry === undefined && v.thinking === undefined) &&
+    activityShape(v) &&
     (v.emotion === undefined || typeof v.emotion === 'string') &&
     (v.choice === undefined || v.choice === 0 || v.choice === 1) &&
     (v.observations === undefined || lab(v.observations))

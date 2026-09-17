@@ -3757,3 +3757,34 @@ select {
   gap: 6px;
   color: var(--ink-500);
 }
+
+/* 서버 대화 공통 ------------------------------------------------------------ */
+.first-buddy .session-progress {
+  width: 100%;
+  margin-top: 16px;
+}
+.draft-chips {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+.draft-chips .chip {
+  cursor: default;
+}
+.chat-pending-note {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-500);
+  font-size: 12px;
+  text-align: right;
+}
+.adaptive-composer .notice,
+.chat-workspace .notice {
+  margin: 0 0 10px;
+}
+.big-choices button:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}

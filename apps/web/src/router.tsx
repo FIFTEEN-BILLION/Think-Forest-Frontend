@@ -4,6 +4,7 @@ import { HomeScreen, NotFoundScreen, VillageRoot } from '@jjcp/app/screens';
 const parent = () => import('@jjcp/app/village/ParentScreen');
 const library = () => import('@jjcp/app/village/LibraryScreen');
 const experience = () => import('@jjcp/app/village/ExperienceScreen');
+const login = () => import('@jjcp/app/village/LoginScreen');
 const adventures = async () => ({
   Component: (await import('@jjcp/app/village/AdventureScreen')).AdventureScreen,
 });
@@ -23,17 +24,24 @@ export const router = createBrowserRouter([
       { path: 'adventures', lazy: adventures },
       { path: 'adventures/:track', lazy: adventures },
       { path: 'adventures/:track/:activityId', lazy: adventures },
+      { path: 'login', lazy: async () => ({ Component: (await login()).LoginScreen }) },
       {
-        path: 'talk',
-        lazy: async () => ({
-          Component: (await import('@jjcp/app/village/ConversationScreen')).ConversationScreen,
-        }),
-      },
-      {
-        path: 'first-talk',
-        lazy: async () => ({
-          Component: (await import('@jjcp/app/village/FirstTalkScreen')).FirstTalkScreen,
-        }),
+        // 서버 대화(티키와 첫인사·티키와 이야기)만 로그인이 필요하다.
+        lazy: async () => ({ Component: (await login()).RequireAuth }),
+        children: [
+          {
+            path: 'talk',
+            lazy: async () => ({
+              Component: (await import('@jjcp/app/village/ConversationScreen')).ConversationScreen,
+            }),
+          },
+          {
+            path: 'first-talk',
+            lazy: async () => ({
+              Component: (await import('@jjcp/app/village/FirstTalkScreen')).FirstTalkScreen,
+            }),
+          },
+        ],
       },
       {
         path: 'words',

@@ -8,6 +8,7 @@ import {
   mergeMessages,
   profileDraftChips,
   progressValue,
+  safeReturnTo,
   toLocalProfile,
 } from '../../../api/v1/chat';
 import { newIdempotencyKey, V1Error } from '../../../api/v1/client';
@@ -32,7 +33,6 @@ import { Button, Notice } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { ChatThread, ChoiceButtons, ReadinessBar, useSpeechInput } from '../components/ServerChat';
 import { useVillage } from '../state/VillageProvider';
-import { safeNext } from '../lib/navigation';
 
 const interestOptions = [
   ['🦕', '공룡'],
@@ -393,7 +393,7 @@ export function FirstTalkScreen() {
             {completion ? (
               <>
                 <span className="adaptive-help">설정에서 언제든 바꿀 수 있어요.</span>
-                <Button onClick={() => navigate(safeNext(params.get('next'), '/talk'))}>
+                <Button onClick={() => navigate(safeReturnTo(params.get('next'), '/talk'))}>
                   좋아! 첫 이야기 시작 <Icon name="arrow" />
                 </Button>
               </>

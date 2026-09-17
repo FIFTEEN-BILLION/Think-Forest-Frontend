@@ -21,6 +21,179 @@ export interface Inquiry {
   finalReason: string;
 }
 
+// First inquiry v2: the "teach the confused thinking friend" engine.
+export type ShadowVariable = 'lightHeight' | 'stickHeight' | 'distance' | 'brightness';
+export interface ShadowSetup {
+  lightHeight: 'low' | 'mid' | 'high';
+  stickHeight: 'short' | 'tall';
+  distance: 'near' | 'far';
+  brightness: 'dim' | 'bright';
+}
+export type Effect = 'longer' | 'shorter' | 'same';
+export type ClaimEffect = Effect | 'unknown';
+export type Confidence = 1 | 2 | 3;
+export type AiSource = 'ai' | 'fallback';
+export type HelpLevel = 'probe' | 'hint' | 'explanation';
+export type InputOrigin = 'example' | 'adult';
+export type ChallengeJudgment = 'agree' | 'disagree' | 'unsure';
+export type SkillId = 'predict' | 'fairTest' | 'evidence' | 'revise' | 'transfer';
+export type SkillLevel = 'independent' | 'afterProbe' | 'afterExplanation' | 'notShown';
+export interface ThinkingClaim {
+  variable: ShadowVariable;
+  effect: ClaimEffect;
+}
+export interface ThinkingExperiment {
+  id: string;
+  base: ShadowSetup;
+  compare: ShadowSetup;
+  baseLength: number;
+  compareLength: number;
+  prediction: Effect;
+  observed: boolean;
+  feedback: HelpLevel | null;
+  surprise: string;
+}
+export interface TeachExchange {
+  message: string;
+  cardIds: string[];
+  convinced: boolean;
+  helpLevel: HelpLevel | null;
+  reply: string;
+  source: AiSource;
+}
+export interface ThinkingChallenge {
+  id: string;
+  line: string;
+  base: ShadowSetup;
+  compare: ShadowSetup;
+  baseLength: number;
+  compareLength: number;
+  friendPrediction: Effect;
+  confounded: boolean;
+  friendCorrect: boolean;
+  source: AiSource;
+  judgment: ChallengeJudgment | null;
+  reason: string;
+  observed: boolean;
+}
+export interface SkillResult {
+  skill: SkillId;
+  level: SkillLevel;
+  quote: string;
+}
+export interface ThinkingInquiry {
+  version: 2;
+  prediction: ClaimEffect | null;
+  reason: string;
+  reasonSkipped: boolean;
+  origin: InputOrigin;
+  confidenceBefore: Confidence | null;
+  restatement: string;
+  restatementConfirmed: boolean;
+  claims: ThinkingClaim[];
+  interpretSource: AiSource | null;
+  friendBeliefId: string;
+  friendLine: string;
+  friendVariable: ShadowVariable | null;
+  checkPlan: string;
+  experiments: ThinkingExperiment[];
+  exchanges: TeachExchange[];
+  convinced: boolean;
+  judgment: InquiryJudgment | null;
+  final: string;
+  finalReason: string;
+  confidenceAfter: Confidence | null;
+  challenge: ThinkingChallenge | null;
+  finalClaims: ThinkingClaim[];
+  skills: SkillResult[];
+}
+
+// Path teaching: the child teaches 티키 by talking. 티키 (AI) turns the words into a literal
+// program; a deterministic engine runs it. AI never plans the path or invents the result.
+export type Sensor = 'front' | 'left' | 'right';
+export type SensorState = 'open' | 'blocked';
+export type Heading = 'up' | 'right' | 'down' | 'left';
+export type PathOutcome = 'arrived' | 'splashed' | 'bumped' | 'ended' | 'loop' | 'tooLong';
+export type PathSkillId = 'predict' | 'precise' | 'revise' | 'challenge' | 'generalize';
+export interface LeafStep {
+  op: 'move' | 'turn' | 'stop';
+  count: number | null;
+  until: 'blocked' | null;
+  dir: 'left' | 'right' | null;
+}
+export interface InnerStep extends Omit<LeafStep, 'op'> {
+  op: LeafStep['op'] | 'if';
+  sensor: Sensor | null;
+  state: SensorState | null;
+  then: LeafStep[];
+  else: LeafStep[];
+}
+export interface ProgramStep extends Omit<InnerStep, 'op'> {
+  op: InnerStep['op'] | 'repeat';
+  body: InnerStep[];
+}
+export interface PathMap {
+  id: string;
+  puddles: number[];
+  start: number;
+  heading: Heading;
+  goal: number;
+}
+export interface HeardPhrase {
+  phrase: string;
+  meaning: string;
+}
+export type PathTurnKind = 'program' | 'clarify' | 'unmapped';
+export interface PathTurn {
+  id: string;
+  text: string;
+  origin: InputOrigin;
+  kind: PathTurnKind;
+  heard: HeardPhrase[];
+  tikiLine: string;
+  source: AiSource;
+  clarify: { question: string; options: { label: string; program: ProgramStep[] }[] } | null;
+  chosen: string | null;
+}
+export interface PathRun {
+  id: string;
+  // How many chat turns existed when this run started; orders runs inside the chat.
+  afterTurn: number;
+  map: PathMap;
+  program: ProgramStep[];
+  cells: number[];
+  outcome: PathOutcome;
+  // Human label of the step 티키 was doing when it stopped, e.g. "2번째 말: 쭉 앞으로".
+  stopLabel: string | null;
+  predicted: number | null;
+  help: number;
+  reaction: {
+    tikiLine: string;
+    question: string | null;
+    source: AiSource;
+    challengeLine: string | null;
+  } | null;
+}
+export interface PathSkillResult {
+  skill: PathSkillId;
+  level: SkillLevel;
+  quote: string;
+}
+export interface PathInquiry {
+  version: 1;
+  program: ProgramStep[];
+  turns: PathTurn[];
+  runs: PathRun[];
+  // Maps in play: the first delivery, then the challenge maps 티키 picked.
+  maps: PathMap[];
+  wins: number;
+  awaitingChallenge: boolean;
+  noChallengeLeft: boolean;
+  prediction: number | null;
+  help: number;
+  skills: PathSkillResult[];
+}
+
 export interface Draft {
   id: string;
   track: Track;
@@ -35,6 +208,8 @@ export interface Draft {
   followup: string;
   hints: number;
   inquiry?: Inquiry;
+  thinking?: ThinkingInquiry;
+  path?: PathInquiry;
   lab: {
     mode: LabMode;
     topic: string;
@@ -67,13 +242,16 @@ export interface SessionRecord {
   source: Provenance;
   text: string;
   answers: Answer[];
-  rubric: Rubric;
+  // Absent for first inquiry v2 and path records: they show thinking skills, never scores.
+  rubric?: Rubric;
   story?: Story;
   emotion?: string;
   choice?: number;
   observations?: Draft['lab'];
   favorite: boolean;
   inquiry?: Inquiry;
+  thinking?: ThinkingInquiry;
+  path?: PathInquiry;
 }
 
 export interface Diagnosis {
@@ -135,6 +313,57 @@ export type LearningEvent =
   | { type: 'inquiry-observe' }
   | { type: 'inquiry-judge'; judgment: InquiryJudgment }
   | { type: 'inquiry-back' }
+  | { type: 'think-predict'; prediction: ClaimEffect }
+  | { type: 'think-reason'; value: string; origin: InputOrigin }
+  | { type: 'think-skip-reason'; skipped: boolean }
+  | { type: 'think-confidence'; when: 'before' | 'after'; value: Confidence }
+  | {
+      type: 'think-interpret';
+      claims: ThinkingClaim[];
+      restatement: string;
+      friendBeliefId: string;
+      friendLine: string;
+      friendVariable: ShadowVariable;
+      source: AiSource;
+    }
+  | { type: 'think-restatement'; confirmed: boolean }
+  | { type: 'think-back' }
+  | { type: 'think-plan'; value: string }
+  | {
+      type: 'think-experiment';
+      id: string;
+      compare: ShadowSetup;
+      prediction: Effect;
+      baseLength: number;
+      compareLength: number;
+    }
+  | { type: 'think-observe'; id: string }
+  | { type: 'think-surprise'; id: string; value: string }
+  | { type: 'think-teach'; exchange: TeachExchange }
+  | { type: 'think-judge'; judgment: InquiryJudgment }
+  | { type: 'think-final'; field: 'final' | 'finalReason'; value: string }
+  | {
+      type: 'think-challenge';
+      challenge: Omit<ThinkingChallenge, 'judgment' | 'reason' | 'observed'>;
+      finalClaims: ThinkingClaim[];
+    }
+  | { type: 'think-challenge-judge'; judgment: ChallengeJudgment }
+  | { type: 'think-challenge-reason'; value: string }
+  | { type: 'think-challenge-observe' }
+  | { type: 'path-teach'; turn: PathTurn; program: ProgramStep[] | null }
+  | { type: 'path-clarify'; turnId: string; label: string; program: ProgramStep[] }
+  | { type: 'path-reset' }
+  | { type: 'path-predict'; cell: number | null }
+  | { type: 'path-run' }
+  | { type: 'path-help' }
+  | {
+      type: 'path-react';
+      runId: string;
+      tikiLine: string;
+      question: string | null;
+      source: AiSource;
+      challenge: { map: PathMap; line: string } | null;
+    }
   | { type: 'text'; text: string }
   | { type: 'hint' }
   | { type: 'advance' }

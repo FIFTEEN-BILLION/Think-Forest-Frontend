@@ -12,5 +12,6 @@ coverage/
 .DS_Store
 Thumbs.db
 legacy/
+docs/
 apps/native/android/
 apps/native/ios/

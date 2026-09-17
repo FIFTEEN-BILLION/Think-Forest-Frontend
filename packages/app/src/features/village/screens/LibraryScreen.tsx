@@ -5,6 +5,8 @@ import { useVillage } from '../state/VillageProvider';
 import { Icon } from '../components/Icon';
 import { StageArt } from '../components/Simulation';
 import { InquiryComparison } from '../components/InquiryComparison';
+import { ThinkingComparison } from '../components/ThinkingComparison';
+import { PathRecordCard } from '../components/PathParts';
 import {
   Button,
   EmptyState,
@@ -196,7 +198,26 @@ export function RecordDetailScreen() {
           서비스 흐름을 살펴보기 위한 예시 목데이터예요. 실제 아이의 학습 결과가 아니에요.
         </Notice>
       )}
-      {record.inquiry ? (
+      {record.path ? (
+        <>
+          <PathRecordCard path={record.path} />
+          <div className="actions">
+            <ReadAloud text={record.text} />
+          </div>
+          <Provenance mock={record.source === 'mock'} />
+        </>
+      ) : record.thinking ? (
+        <>
+          <ThinkingComparison thinking={record.thinking} />
+          <div className="actions">
+            <ReadAloud text={record.text} />
+            <Button className="light" onClick={() => void copy()}>
+              {copied ? '복사했어요' : '내 문장 복사하기'}
+            </Button>
+          </div>
+          <Provenance mock={record.source === 'mock'} />
+        </>
+      ) : record.inquiry ? (
         <>
           <InquiryComparison inquiry={record.inquiry} />
           <div className="actions">
@@ -254,7 +275,7 @@ export function RecordDetailScreen() {
           <div className="stack">
             <section className="panel">
               <h3>이번 활동의 생각 발자국</h3>
-              <RubricBars rubric={record.rubric} />
+              {record.rubric && <RubricBars rubric={record.rubric} />}
               <Provenance mock={record.source === 'mock'} />
             </section>
             {record.story && (
@@ -302,6 +323,45 @@ export function CompleteScreen() {
         to="/shelf"
         action="책장으로 가기"
       />
+    );
+  if (record.thinking || record.path)
+    return (
+      <div className="inquiry">
+        <div className="success-head">
+          <div className="success-mark">
+            <Icon name="sprout" />
+          </div>
+          <span className="tag teal" role="status">
+            {storageError ? '기기 저장 확인 필요' : '저장 완료'}
+          </span>
+          <h1>내 탐구를 책장에 담았어요.</h1>
+          <p>
+            {storageError
+              ? '현재 화면에는 남아 있어요. 기기에는 저장하지 못했으니 기록 관리에서 내려받아 주세요.'
+              : record.path
+                ? '처음 가르친 규칙부터 고친 카드까지, 언제든 다시 볼 수 있어요.'
+                : '처음 생각부터 친구를 설득한 증거까지, 언제든 다시 볼 수 있어요.'}
+          </p>
+        </div>
+        {record.path ? (
+          <PathRecordCard path={record.path} />
+        ) : (
+          record.thinking && <ThinkingComparison thinking={record.thinking} />
+        )}
+        <div className="actions split">
+          <Link to="/" className="btn light">
+            첫 화면으로
+          </Link>
+          <Link to={`/shelf/${record.id}`} className="btn">
+            책장에서 다시 보기
+            <Icon name="book" />
+          </Link>
+        </div>
+        <p className="inquiry-footnote">
+          생각 친구는 AI예요. 결과 계산과 설득 판정은 정해진 규칙이 해요. · 사고 기술은 점수가
+          아니에요.
+        </p>
+      </div>
     );
   if (record.inquiry)
     return (
@@ -354,7 +414,7 @@ export function CompleteScreen() {
         </span>
         <h2 className="space-top">{record.title}</h2>
         <div className="quote">{record.answers.at(-1)?.text}</div>
-        <RubricBars rubric={record.rubric} />
+        {record.rubric && <RubricBars rubric={record.rubric} />}
         <Provenance mock={record.source === 'mock'} />
         <div className="actions split">
           <Link to="/adventures" className="btn light">

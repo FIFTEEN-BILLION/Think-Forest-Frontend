@@ -1,12 +1,22 @@
 import { CATALOG, FORESTS } from '../data/catalog';
+import { CONDITIONS, JUDGMENTS, inquiryComplete, inquiryGuard, inquiryTransition } from './inquiry';
 import {
-  CONDITIONS,
-  JUDGMENTS,
-  emptyInquiry,
-  inquiryComplete,
-  inquiryGuard,
-  inquiryTransition,
-} from './inquiry';
+  CHALLENGE_JUDGMENT_LABEL,
+  PREDICTION_LABEL,
+  deriveSkills,
+  emptyThinking,
+  thinkingComplete,
+  thinkingGuard,
+  thinkingTransition,
+} from './thinking';
+import {
+  derivePathSkills,
+  emptyPath,
+  pathComplete,
+  pathGuard,
+  pathTransition,
+  programText,
+} from './path';
 import type {
   Draft,
   Answer,
@@ -19,6 +29,7 @@ import type {
   VillageData,
 } from '../types';
 
+export const PATH_ACTIVITY = 'path-teaching';
 export function count(text: string) {
   return [...text.replace(/\s/g, '')].length;
 }
@@ -50,12 +61,13 @@ export function score(text: string): Rubric {
   };
 }
 export function gateSize(data: VillageData) {
-  const last = data.sessions.find((s) => s.source === 'local');
+  // Thinking-skill records carry no score, so they never tune the writing gate.
+  const last = data.sessions.find((s) => s.source === 'local' && s.rubric)?.rubric;
   const level: Level =
     data.settings.autoTune && last
-      ? average(last.rubric) < 40
+      ? average(last) < 40
         ? '쉬움'
-        : average(last.rubric) >= 75
+        : average(last) >= 75
           ? '도전'
           : '보통'
       : data.settings.gate;
@@ -129,7 +141,8 @@ export function createDraft(track: Track, activityId: string, min: number, keywo
     answers: [],
     followup: '',
     hints: 0,
-    ...(activityId === 'first-inquiry' ? { inquiry: emptyInquiry() } : {}),
+    ...(activityId === 'first-inquiry' ? { thinking: emptyThinking() } : {}),
+    ...(activityId === PATH_ACTIVITY ? { path: emptyPath() } : {}),
     lab: {
       mode: activityId === 'balance' ? 'balance' : activityId === 'custom' ? 'custom' : 'shadow',
       topic: '',
@@ -159,7 +172,8 @@ export function writingStep(d: Draft) {
       : d.step === 3;
 }
 export function guard(d: Draft): string | null {
-  if (d.activityId === 'first-inquiry') return inquiryGuard(d);
+  if (d.activityId === PATH_ACTIVITY) return pathGuard(d);
+  if (d.activityId === 'first-inquiry') return d.thinking ? thinkingGuard(d) : inquiryGuard(d);
   if (writingStep(d) && count(d.text) < d.min)
     return `공백을 빼고 ${d.min}자 이상, 내 생각을 먼저 적어 주세요.`;
   if (d.track === 'lab') {
@@ -183,7 +197,9 @@ export function guard(d: Draft): string | null {
 }
 // All progress changes pass this pure transition function; disabled buttons are only a UI aid.
 export function transition(draft: Draft, event: LearningEvent): { draft: Draft; error?: string } {
-  if (draft.activityId === 'first-inquiry') return inquiryTransition(draft, event);
+  if (draft.activityId === PATH_ACTIVITY) return pathTransition(draft, event);
+  if (draft.activityId === 'first-inquiry')
+    return draft.thinking ? thinkingTransition(draft, event) : inquiryTransition(draft, event);
   const d = structuredClone(draft);
   const fail = (error: string) => ({ draft, error });
   if (event.type === 'text') d.text = event.text.slice(0, 2000);
@@ -268,7 +284,9 @@ export function transition(draft: Draft, event: LearningEvent): { draft: Draft; 
   return { draft: d };
 }
 export function readyToComplete(d: Draft) {
-  if (d.activityId === 'first-inquiry') return inquiryComplete(d);
+  if (d.activityId === PATH_ACTIVITY) return pathComplete(d);
+  if (d.activityId === 'first-inquiry')
+    return d.thinking ? thinkingComplete(d) : inquiryComplete(d);
   if (d.track === 'forest')
     return d.step === 4 && d.answers.length === 3 && d.answers.every((a) => count(a.text) >= d.min);
   if (d.track === 'lab')
@@ -299,6 +317,68 @@ export function scoreAnswers(answers: Answer[]): Rubric {
 }
 export function toRecord(d: Draft): SessionRecord {
   if (!readyToComplete(d)) throw new Error('모든 단계를 마친 뒤 기록을 남길 수 있어요.');
+  const p = d.path;
+  if (p) {
+    const said = p.turns.filter((t) => t.kind !== 'unmapped').map((t) => t.text);
+    const wins = p.runs.filter((r) => r.outcome === 'arrived');
+    const answers: Answer[] = [
+      { question: '티키에게 처음 한 말', text: said[0] ?? '' },
+      { question: '고쳐서 다시 한 말', text: said.slice(1).join('\n') || '아직 없음' },
+      {
+        question: '우체국에 도착한 말',
+        text: wins.length ? programText(wins[wins.length - 1]!.program) : '아직 없음',
+      },
+    ];
+    return {
+      id: d.id,
+      track: d.track,
+      activityId: d.activityId,
+      title: d.title,
+      date: localDate(),
+      completedAt: new Date().toISOString(),
+      durationMinutes: Math.max(1, Math.round((Date.now() - Date.parse(d.startedAt)) / 60000)),
+      source: 'local',
+      text: answers.map((a) => `${a.question}\n${a.text}`).join('\n\n'),
+      answers,
+      favorite: false,
+      path: { ...p, skills: derivePathSkills(p) },
+    };
+  }
+  const t = d.thinking;
+  if (t) {
+    const taught = t.exchanges.find((x) => x.convinced) ?? t.exchanges[t.exchanges.length - 1];
+    const answers: Answer[] = [
+      {
+        question: '처음 예측과 이유',
+        text: `${PREDICTION_LABEL[t.prediction ?? 'unknown']}\n이유: ${t.reasonSkipped ? '아직 설명하기 어려웠어요.' : t.reason}`,
+      },
+      { question: '생각 친구에게 한 설명', text: taught?.message ?? '' },
+      {
+        question: t.judgment ? JUDGMENTS[t.judgment] : '지금 내 생각',
+        text: `${t.final}\n이유: ${t.finalReason}`,
+      },
+      {
+        question: '친구의 새 예측 판단',
+        text: t.challenge?.judgment
+          ? `${CHALLENGE_JUDGMENT_LABEL[t.challenge.judgment]}\n이유: ${t.challenge.reason}`
+          : '',
+      },
+    ];
+    return {
+      id: d.id,
+      track: d.track,
+      activityId: d.activityId,
+      title: d.title,
+      date: localDate(),
+      completedAt: new Date().toISOString(),
+      durationMinutes: Math.max(1, Math.round((Date.now() - Date.parse(d.startedAt)) / 60000)),
+      source: 'local',
+      text: answers.map((a) => a.text).join('\n\n'),
+      answers,
+      favorite: false,
+      thinking: { ...t, skills: deriveSkills(t) },
+    };
+  }
   const q = d.inquiry;
   const answers = q
     ? [

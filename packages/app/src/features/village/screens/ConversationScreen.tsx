@@ -17,7 +17,7 @@ type Recognition = {
   onerror: (() => void) | null;
 };
 const prompts = [
-  '오늘은 과학 이야기를 해 볼까? 차가운 얼음물 컵 밖에 왜 물방울이 생기는지 궁금해!',
+  '오늘은 과학 이야기를 해 볼까? 차가운 얼음물 컵 밖에 왜 물방울이 생기는지 궁금해! “어? 컵이 젖었네!”라고 생각한 적 있어?',
   '좋은 생각이야! 그럼 컵 밖의 물은 어디서 왔다고 생각해?',
   '왜 그 답을 골랐는지 “내 생각에는…”으로 시작해서 말해 줄래?',
   '마지막으로, 처음 생각과 지금 생각을 한 문장으로 이어 보자. 천천히 길게 말해도 괜찮아.',
@@ -27,13 +27,24 @@ export function ConversationScreen() {
   const { data, update, toast } = useVillage();
   const [step, setStep] = useState(0),
     [choice, setChoice] = useState(''),
-    [text, setText] = useState('');
+    [text, setText] = useState(''),
+    [answers, setAnswers] = useState<string[]>([]);
   const [listening, setListening] = useState(false),
     [done, setDone] = useState(false),
     [showWord, setShowWord] = useState(false),
     [saved, setSaved] = useState(false);
   const recognition = useRef<Recognition | null>(null);
+  const threadRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => () => recognition.current?.stop(), []);
+  useEffect(() => {
+    threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: 'smooth' });
+  }, [step, answers]);
+  const recordAnswer = (index: number, answer: string) =>
+    setAnswers((current) => [...current.slice(0, index), answer]);
+  const answerFirst = (answer: string) => {
+    recordAnswer(0, answer);
+    setStep(1);
+  };
   const listen = () => {
     const speechWindow = window as typeof window & {
       SpeechRecognition?: new () => Recognition;
@@ -77,12 +88,25 @@ export function ConversationScreen() {
       toast('“왜냐하면”을 붙여 한 문장으로 더 말해 볼까요?');
       return;
     }
+    const choiceAnswer = {
+      A: '컵 안의 물이 새었다고 생각해.',
+      B: '공기 속의 물이 컵 밖에 붙었다고 생각해.',
+      C: '컵이 물을 만들었다고 생각해.',
+    }[choice];
+    const answer = step === 1 ? choiceAnswer : text.trim();
+    if (answer) recordAnswer(step, answer);
     if (step === 3) {
       setDone(true);
       return;
     }
     setStep((value) => value + 1);
     if (step >= 2) setText('');
+  };
+  const goBack = () => {
+    const previous = Math.max(0, step - 1);
+    setStep(previous);
+    setAnswers((current) => current.slice(0, previous));
+    setText('');
   };
   const saveStory = () => {
     if (saved) return;
@@ -224,14 +248,44 @@ export function ConversationScreen() {
           </div>
         </aside>
         <section className="chat-workspace">
-          <div className="ai-bubble">
-            <span className="bubble-name">🌱 티키</span>
-            <p>{prompts[step]}</p>
-            {step === 0 && (
-              <button className="word-inline" onClick={() => setShowWord(true)}>
-                결로 <small>뜻 보기</small>
-              </button>
-            )}
+          <div className="chat-title">
+            <div>
+              <span>🌱</span>
+              <div>
+                <strong>생각친구 티키</strong>
+                <small>지우와 대화 중</small>
+              </div>
+            </div>
+            <span className="online-dot">지금 접속 중</span>
+          </div>
+          <div className="conversation-thread" ref={threadRef} aria-live="polite">
+            {prompts.slice(0, step + 1).map((prompt, index) => (
+              <div className="message-pair" key={prompt}>
+                <div className="chat-message ai-message">
+                  <span className="message-avatar">🌱</span>
+                  <div>
+                    <span className="message-name">티키</span>
+                    <p>{prompt}</p>
+                    {index === 0 && (
+                      <button className="word-inline" onClick={() => setShowWord(true)}>
+                        결로 <small>뜻 보기</small>
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {answers[index] && (
+                  <div className="chat-message child-message">
+                    <div>
+                      <span className="message-name">{data.profile.name}</span>
+                      <p>{answers[index]}</p>
+                    </div>
+                    <span className="message-avatar child-avatar">
+                      {data.profile.name.slice(0, 1)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
           {showWord && (
             <div className="word-popover">
@@ -246,10 +300,9 @@ export function ConversationScreen() {
           )}
           {step === 0 && (
             <div className="first-response">
-              <p>“어? 컵이 젖었네!”라고 생각한 적 있어?</p>
               <div className="choice-row">
-                <Button onClick={() => setStep(1)}>응, 본 적 있어</Button>
-                <Button className="light" onClick={() => setStep(1)}>
+                <Button onClick={() => answerFirst('응, 나도 본 적 있어!')}>응, 본 적 있어</Button>
+                <Button className="light" onClick={() => answerFirst('아니, 나는 오늘 처음 봤어.')}>
                   아니, 처음이야
                 </Button>
               </div>
@@ -302,7 +355,7 @@ export function ConversationScreen() {
           )}
           {step > 0 && (
             <div className="conversation-actions">
-              <button className="text-back" onClick={() => setStep(Math.max(0, step - 1))}>
+              <button className="text-back" onClick={goBack}>
                 ← 이전
               </button>
               <Button disabled={(step === 1 && !choice) || listening} onClick={next}>

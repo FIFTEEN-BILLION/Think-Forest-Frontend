@@ -20,13 +20,15 @@ import { useVillage } from '../state/VillageProvider';
 import type { Draft } from '../types';
 import { useStepFocus } from '../lib/useStepFocus';
 import { InquiryScreen } from './InquiryScreen';
+import { PathTeachingScreen } from './PathTeachingScreen';
+import { ThinkingInquiryScreen } from './ThinkingInquiryScreen';
 
 export function SessionScreen() {
   const { data, storageError } = useVillage();
   const { track } = useParams();
   const d = data.resume;
   useStepFocus(d?.step);
-  if (!data.consent.done) return <Navigate to="/onboarding" replace />;
+  if (!data.consent.done) return <Navigate to="/first-talk" replace />;
   if (!d)
     return (
       <EmptyState
@@ -35,6 +37,11 @@ export function SessionScreen() {
       />
     );
   if (track !== d.track) return <Navigate to={`/session/${d.track}`} replace />;
+  if (d.activityId === 'path-teaching' && d.path)
+    return <PathTeachingScreen key={d.id} draft={d} />;
+  if (d.activityId === 'first-inquiry' && d.thinking)
+    return <ThinkingInquiryScreen key={d.id} draft={d} />;
+  // Legacy v1 drafts saved before the thinking engine keep their original flow.
   if (d.activityId === 'first-inquiry' && d.inquiry) return <InquiryScreen key={d.id} draft={d} />;
   return (
     <>
@@ -191,7 +198,7 @@ function ForestFlow({ draft: d }: { draft: Draft }) {
             <span className="avatar">
               <Icon name="sprout" />
             </span>
-            생각숲에 오신 걸 환영해요
+            우리 아이 생각친구, 티키에 오신 걸 환영해요
           </div>
           <h2>눈에 보이는 것부터, 하나씩.</h2>
           <p>한 번에 답을 찾지 않아도 괜찮아요. 먼저 이야기 속 장면을 천천히 읽어 봐요.</p>

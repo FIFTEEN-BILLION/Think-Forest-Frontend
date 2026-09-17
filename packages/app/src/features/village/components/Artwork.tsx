@@ -5,7 +5,7 @@ export function VillageArt() {
       viewBox="0 0 520 370"
       preserveAspectRatio="xMidYMid slice"
       role="img"
-      aria-label="생각숲, 실험실과 마음극장이 초록 언덕에 모여 있는 생각숲 일러스트"
+      aria-label="우리 아이 생각친구 티키와 실험실, 마음극장이 초록 언덕에 모여 있는 일러스트"
     >
       <defs>
         <linearGradient id="sky" x2="0" y2="1">

@@ -1,11 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Icon } from '../components/Icon';
-import { Button, PageHeading } from '../components/ui';
+import { PageHeading } from '../components/ui';
 import { COMMUNITY_STORIES } from '../data/experience';
-import { useVillage } from '../state/VillageProvider';
 
 export function CommunityScreen() {
-  const { toast } = useVillage();
   const [scope, setScope] = useState('모두');
   const shown = COMMUNITY_STORIES.filter(
     (story) => scope === '모두' || ['내 친구', '가족'].includes(scope) || story.category === scope,
@@ -17,9 +16,9 @@ export function CommunityScreen() {
         title="친구들의 생각은 어떤 모험이 됐을까?"
         description="보호자가 확인한 이야기만 보여요."
       >
-        <Button onClick={() => toast('내 이야기의 공개 범위를 고르는 화면을 열었어요.')}>
+        <Link className="btn" to="/story-share">
           <Icon name="share" /> 내 이야기 공유
-        </Button>
+        </Link>
       </PageHeading>
       <div className="sharing-safety">
         <Icon name="shield" />
@@ -62,9 +61,9 @@ export function CommunityScreen() {
                 <button className="like">
                   <Icon name="heart" /> {story.likes}
                 </button>
-                <button className="read-more">
+                <Link className="read-more" to={`/community/${story.id}`}>
                   이야기 읽기 <Icon name="arrow" />
-                </button>
+                </Link>
               </div>
             </div>
           </article>

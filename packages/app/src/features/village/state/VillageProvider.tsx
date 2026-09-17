@@ -126,7 +126,7 @@ export function VillageProvider({ children }: PropsWithChildren) {
       setData(next);
       setParentUnlocked(false);
       setStorageError('');
-      toast('이 기기의 리액트 생각숲 기록을 삭제했어요.');
+      toast('이 기기의 우리 아이 생각친구, 티키 기록을 삭제했어요.');
       return true;
     } catch {
       toast('저장소에 접근할 수 없어 삭제하지 못했어요.');

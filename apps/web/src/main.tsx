@@ -13,9 +13,13 @@ const apiBaseUrl =
   import.meta.env.VITE_API_BASE_URL ??
   (import.meta.env.PROD ? 'https://think-forest-backend.vercel.app' : '/api');
 
+// JJCP API v1 은 같은 출처 /api/v1 (개발: Vite 프록시, 배포: Netlify 프록시)로 부른다.
+// 개발용 로그인 버튼은 호스트가 켤 때만 보인다.
+const devLogin = import.meta.env.VITE_DEV_LOGIN === 'true';
+
 createRoot(root).render(
   <StrictMode>
-    <AppProviders apiBaseUrl={apiBaseUrl}>
+    <AppProviders apiBaseUrl={apiBaseUrl} v1BaseUrl="/api/v1" devLogin={devLogin}>
       <RouterProvider router={router} />
     </AppProviders>
   </StrictMode>,

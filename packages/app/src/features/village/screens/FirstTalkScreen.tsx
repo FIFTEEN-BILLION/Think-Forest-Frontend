@@ -138,7 +138,8 @@ export function FirstTalkScreen() {
         guardian: '보호자 계정과 연결',
         noticeAt: new Date().toISOString(),
       },
-      onboarding: { ...previous.onboarding, step: 4, acknowledged: true, childPolicy: true },
+      // step is 0..3 in storage decode; 4 would make the saved data unreadable after reload.
+      onboarding: { ...previous.onboarding, step: 3, acknowledged: true, childPolicy: true },
     }));
     updateUser({ needsFirstGreeting: false });
     setSession((current) => (current ? { ...current, status: 'COMPLETED' } : current));

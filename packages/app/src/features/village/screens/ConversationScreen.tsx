@@ -15,6 +15,7 @@ import {
   completeConversation,
   getConversation,
   getHome,
+  getStory,
   listConversations,
   listTopics,
   sendConversationMessage,
@@ -332,7 +333,13 @@ function ConversationChat({
           if (!isActive()) return;
           setLoadError('');
           setView(fromDetail(detail));
-          if (detail.status === 'COMPLETED' && detail.story) setStory(detail.story);
+          if (detail.status !== 'COMPLETED') return;
+          if (detail.story) setStory(detail.story);
+          else if (detail.storyId)
+            void getStory(client, detail.storyId).then(
+              (r) => isActive() && setStory(r.story),
+              () => undefined,
+            );
         },
         (error: unknown) => {
           if (!isActive() || (error instanceof V1Error && error.status === 401)) return;
@@ -343,7 +350,7 @@ function ConversationChat({
           );
         },
       ),
-    [],
+    [client],
   );
   useEffect(() => {
     let active = true;

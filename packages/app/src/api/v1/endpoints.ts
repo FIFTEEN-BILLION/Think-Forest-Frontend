@@ -4,6 +4,7 @@ import type { V1Client } from './client';
 import { newIdempotencyKey, V1_BASE_URL } from './client';
 import type {
   CompletionTrigger,
+  Story,
   ConversationCompletion,
   ConversationDetail,
   ConversationListItem,
@@ -150,6 +151,10 @@ export function getConversation(
     query,
     signal,
   });
+}
+
+export function getStory(client: V1Client, storyId: string, signal?: AbortSignal) {
+  return client.request<{ story: Story }>(`/stories/${id(storyId)}`, { signal });
 }
 
 export function sendConversationMessage(

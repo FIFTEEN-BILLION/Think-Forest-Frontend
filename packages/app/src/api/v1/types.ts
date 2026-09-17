@@ -186,6 +186,8 @@ export interface ConversationDetail {
   currentInteraction: NextInteraction | null;
   readiness: ConversationReadiness;
   story?: Story | null;
+  // 완료된 대화는 정리본 id 만 내려온다. 본문은 GET /stories/{id} 로 읽는다.
+  storyId?: string | null;
 }
 
 export interface ConversationMessageResponse {

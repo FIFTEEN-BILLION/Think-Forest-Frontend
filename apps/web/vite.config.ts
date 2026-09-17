@@ -7,5 +7,15 @@ export default defineConfig({
     alias: [{ find: /^react-native$/, replacement: 'react-native-web' }],
     dedupe: ['react', 'react-dom'],
   },
-  server: { port: 5173, strictPort: true },
+  server: {
+    port: 5173,
+    strictPort: true,
+    proxy: {
+      '/api': {
+        target: 'https://think-forest-backend.vercel.app',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, ''),
+      },
+    },
+  },
 });

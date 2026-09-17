@@ -1,6 +1,7 @@
 import { initialData } from '../data/mock';
 import { CATALOG } from '../data/catalog';
-import type { Draft, Inquiry, SessionRecord, VillageData } from '../types';
+import { VARIABLE_ORDER, isSetup } from './shadow';
+import type { Draft, Inquiry, SessionRecord, ThinkingInquiry, VillageData } from '../types';
 
 export const STORAGE_KEY = 'jaram_village_react_v1';
 const object = (v: unknown): v is Record<string, unknown> =>
@@ -64,6 +65,73 @@ export function isInquiry(v: unknown): v is Inquiry {
     v.observed.every((c) => c === 'low' || c === 'high')
   );
 }
+const effects = ['longer', 'shorter', 'same'];
+export function isThinking(v: unknown): v is ThinkingInquiry {
+  if (!object(v) || v.version !== 2) return false;
+  const template = {
+    reason: '',
+    reasonSkipped: false,
+    origin: '',
+    restatement: '',
+    restatementConfirmed: false,
+    friendBeliefId: '',
+    friendLine: '',
+    checkPlan: '',
+    convinced: false,
+    final: '',
+    finalReason: '',
+  };
+  const ch = v.challenge;
+  return (
+    like(template, v) &&
+    ['example', 'adult'].includes(String(v.origin)) &&
+    [null, ...effects, 'unknown'].includes(v.prediction as string | null) &&
+    [null, 1, 2, 3].includes(v.confidenceBefore as number | null) &&
+    [null, 1, 2, 3].includes(v.confidenceAfter as number | null) &&
+    [null, 'keep', 'change', 'explore'].includes(v.judgment as string | null) &&
+    ([null, ...VARIABLE_ORDER] as (string | null)[]).includes(v.friendVariable as string | null) &&
+    [v.claims, v.finalClaims, v.skills].every(Array.isArray) &&
+    Array.isArray(v.exchanges) &&
+    v.exchanges.every(
+      (x) =>
+        object(x) &&
+        like({ message: '', convinced: false, reply: '', source: '' }, x) &&
+        strings(x.cardIds),
+    ) &&
+    Array.isArray(v.experiments) &&
+    v.experiments.length <= 5 &&
+    v.experiments.every(
+      (e) =>
+        object(e) &&
+        like({ id: '', baseLength: 0, compareLength: 0, observed: false, surprise: '' }, e) &&
+        isSetup(e.base) &&
+        isSetup(e.compare) &&
+        effects.includes(String(e.prediction)),
+    ) &&
+    (ch === null ||
+      (object(ch) &&
+        like(
+          {
+            id: '',
+            line: '',
+            baseLength: 0,
+            compareLength: 0,
+            confounded: false,
+            friendCorrect: false,
+            reason: '',
+            observed: false,
+          },
+          ch,
+        ) &&
+        isSetup(ch.base) &&
+        isSetup(ch.compare)))
+  );
+}
+function firstInquiry(v: Record<string, unknown>) {
+  return v.thinking === undefined
+    ? isInquiry(v.inquiry)
+    : isThinking(v.thinking) && v.inquiry === undefined;
+}
 export function isDraft(v: unknown): v is Draft {
   if (
     !object(v) ||
@@ -86,8 +154,8 @@ export function isDraft(v: unknown): v is Draft {
   const t = v.theater;
   return (
     (v.activityId === 'first-inquiry'
-      ? isInquiry(v.inquiry) && Number(v.step) <= 4
-      : v.inquiry === undefined) &&
+      ? firstInquiry(v) && Number(v.step) <= 4
+      : v.inquiry === undefined && v.thinking === undefined) &&
     like({ keyword: '', scene: 0, emotion: '', approved: false }, t) &&
     [0, 1, 2, 3].includes(Number(t.scene)) &&
     [null, 0, 1].includes(t.choice as null | number) &&
@@ -104,15 +172,20 @@ export function isSession(v: unknown): v is SessionRecord {
     ['mock', 'local'].includes(String(v.source)) &&
     CATALOG.some((a) => a.id === v.activityId && a.track === v.track) &&
     answers(v.answers) &&
-    object(v.rubric) &&
-    ['observe', 'reason', 'express'].every(
-      (k) =>
-        typeof (v.rubric as Record<string, unknown>)[k] === 'number' &&
-        Number((v.rubric as Record<string, unknown>)[k]) >= 0 &&
-        Number((v.rubric as Record<string, unknown>)[k]) <= 100,
-    ) &&
+    // Thinking-skill records have no score; every other record keeps its rubric.
+    (v.thinking !== undefined
+      ? v.rubric === undefined
+      : object(v.rubric) &&
+        ['observe', 'reason', 'express'].every(
+          (k) =>
+            typeof (v.rubric as Record<string, unknown>)[k] === 'number' &&
+            Number((v.rubric as Record<string, unknown>)[k]) >= 0 &&
+            Number((v.rubric as Record<string, unknown>)[k]) <= 100,
+        )) &&
     (v.story === undefined || story(v.story)) &&
-    (v.activityId === 'first-inquiry' ? isInquiry(v.inquiry) : v.inquiry === undefined) &&
+    (v.activityId === 'first-inquiry'
+      ? firstInquiry(v)
+      : v.inquiry === undefined && v.thinking === undefined) &&
     (v.emotion === undefined || typeof v.emotion === 'string') &&
     (v.choice === undefined || v.choice === 0 || v.choice === 1) &&
     (v.observations === undefined || lab(v.observations))

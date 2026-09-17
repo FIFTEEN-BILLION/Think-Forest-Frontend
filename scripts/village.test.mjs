@@ -37,10 +37,24 @@ function send(draft, event) {
 }
 const next = (d) => send(d, { type: 'advance' });
 const write = (d) => send(d, { type: 'text', text: essay });
-const { requestInquiryQuestion } = load(resolve(root, 'lib/inquiry.ts'));
+const { requestInquiryQuestion, emptyInquiry } = load(resolve(root, 'lib/inquiry.ts'));
 const field = (d, field, value) => send(d, { type: 'inquiry-field', field, value });
+// Drafts saved before the thinking engine keep the v1 inquiry shape.
+function legacyDraft() {
+  const d = createDraft('lab', 'first-inquiry', 15);
+  delete d.thinking;
+  d.inquiry = emptyInquiry();
+  return d;
+}
+
+test('new first inquiry drafts start the thinking engine; legacy drafts stay readable', () => {
+  const d = createDraft('lab', 'first-inquiry', 15);
+  assert.equal(d.thinking.version, 2);
+  assert.equal(d.inquiry, undefined);
+  assert.equal(storage.isDraft(legacyDraft()), true);
+});
 function inquiryAtObservation() {
-  let d = createDraft('lab', 'first-inquiry', 15);
+  let d = legacyDraft();
   d = field(d, 'initial', '빛을 올리면 그림자가 길어질 것 같아요.');
   d = field(d, 'reason', '빛이 멀리 퍼지기 때문이에요.');
   d = next(d);
@@ -58,7 +72,7 @@ function inquiryAtJudgment() {
 }
 
 test('first inquiry keeps questions and observations closed until both thought and reason exist', () => {
-  let d = createDraft('lab', 'first-inquiry', 15);
+  let d = legacyDraft();
   assert.ok(transition(d, { type: 'advance' }).error);
   d = field(d, 'initial', essay);
   d = field(d, 'reason', ' \n ');

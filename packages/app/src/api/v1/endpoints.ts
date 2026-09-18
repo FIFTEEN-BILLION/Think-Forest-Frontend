@@ -2,6 +2,23 @@
 
 import type { V1Client } from './client';
 import type {
+  ActivityCompleteResponse,
+  ActivityDetail,
+  ActivityItem,
+  ActivityPatchRequest,
+  ActivitySession,
+  ActivityStartRequest,
+  ActivityTrack,
+  MissingCondition,
+  TopicCategory,
+  TopicCategoryCreateRequest,
+  TopicCategoryUpdateRequest,
+  TopicCreateRequest,
+  TopicCreateResponse,
+  TopicDetail,
+  TopicListItem,
+} from './types';
+import type {
   Device,
   DeviceRequest,
   NotificationItem,
@@ -861,4 +878,158 @@ export function registerDevice(client: V1Client, body: DeviceRequest) {
 
 export function unregisterDevice(client: V1Client, deviceId: string) {
   return client.request<{ ok: boolean }>(`/devices/${id(deviceId)}`, { method: 'DELETE' });
+}
+
+// --- F1 홈·주제·활동 ---
+
+/** 서버가 409 로 돌려준 단계 조건을 아이에게 보여 줄 문장으로 바꾼다. */
+export function stepMissingReasons(error: unknown): string[] {
+  if (!(error instanceof V1Error)) return [];
+  const conditions = error.details?.conditions;
+  if (Array.isArray(conditions)) {
+    const messages = conditions
+      .map((item) => (item as MissingCondition | null)?.message)
+      .filter((message): message is string => Boolean(message));
+    if (messages.length) return messages;
+  }
+  return error.message ? [error.message] : [];
+}
+
+// ---------- 주제 ----------
+
+export function getTopic(client: V1Client, topicId: string, signal?: AbortSignal) {
+  return client.request<{ topic: TopicDetail }>(`/topics/${id(topicId)}`, { signal });
+}
+
+/** 안전하지 않은 주제는 422 `UNSAFE_TOPIC` 으로 거절된다. 저장도 대화 생성도 하지 않는다. */
+export function createTopic(
+  client: V1Client,
+  body: TopicCreateRequest,
+  idempotencyKey = newIdempotencyKey(),
+) {
+  return client.request<TopicCreateResponse>('/topics', { body, idempotencyKey });
+}
+
+export async function listTopicPage(
+  client: V1Client,
+  query: {
+    recommended?: boolean;
+    category?: string;
+    query?: string;
+    cursor?: string;
+    limit?: number;
+  },
+  signal?: AbortSignal,
+) {
+  return toPage<TopicListItem>(
+    await client.request<unknown>('/topics', { query, signal }),
+    'topics',
+  );
+}
+
+// ---------- 주제 카테고리 ----------
+
+export async function listTopicCategories(client: V1Client, signal?: AbortSignal) {
+  return toPage<TopicCategory>(
+    await client.request<unknown>('/topic-categories', { signal }),
+    'categories',
+  );
+}
+
+export function createTopicCategory(client: V1Client, body: TopicCategoryCreateRequest) {
+  return client.request<{ category: TopicCategory }>('/topic-categories', { body });
+}
+
+/** 기본 카테고리를 고치면 403 `CATEGORY_NOT_EDITABLE` 이 온다. */
+export function updateTopicCategory(
+  client: V1Client,
+  categoryId: string,
+  body: TopicCategoryUpdateRequest,
+) {
+  return client.request<{ category: TopicCategory }>(`/topic-categories/${id(categoryId)}`, {
+    method: 'PATCH',
+    body,
+  });
+}
+
+export function deleteTopicCategory(client: V1Client, categoryId: string) {
+  return client.request<void>(`/topic-categories/${id(categoryId)}`, { method: 'DELETE' });
+}
+
+// ---------- 생각 모험 활동 ----------
+
+export async function listActivities(
+  client: V1Client,
+  query: {
+    query?: string;
+    track?: ActivityTrack;
+    area?: string;
+    cursor?: string;
+    limit?: number;
+  } = {},
+  signal?: AbortSignal,
+) {
+  return toPage<ActivityItem>(
+    await client.request<unknown>('/activities', { query, signal }),
+    'activities',
+  );
+}
+
+export function getActivity(client: V1Client, activityId: string, signal?: AbortSignal) {
+  return client.request<{ activity: ActivityDetail }>(`/activities/${id(activityId)}`, { signal });
+}
+
+// ---------- 활동 세션 ----------
+
+export function startActivitySession(
+  client: V1Client,
+  body: ActivityStartRequest,
+  idempotencyKey = newIdempotencyKey(),
+) {
+  return client.request<{ session: ActivitySession }>('/activity-sessions', {
+    body,
+    idempotencyKey,
+  });
+}
+
+export function getActivitySession(client: V1Client, sessionId: string, signal?: AbortSignal) {
+  return client.request<{ session: ActivitySession }>(`/activity-sessions/${id(sessionId)}`, {
+    signal,
+  });
+}
+
+/** 자동 저장. 초안 번호가 어긋나면 409 `ACTIVITY_REVISION_CONFLICT` 가 온다. */
+export function patchActivitySession(
+  client: V1Client,
+  sessionId: string,
+  body: ActivityPatchRequest,
+) {
+  return client.request<{ session: ActivitySession }>(`/activity-sessions/${id(sessionId)}`, {
+    method: 'PATCH',
+    body,
+  });
+}
+
+/** 서버가 단계 조건을 다시 검사한다. 부족하면 409 `ACTIVITY_STEP_NOT_READY`. */
+export function advanceActivitySession(client: V1Client, sessionId: string) {
+  return client.request<{ session: ActivitySession }>(
+    `/activity-sessions/${id(sessionId)}/advance`,
+    { body: {} },
+  );
+}
+
+/** 완료하면 서버가 책장 기록을 만든다. */
+export function completeActivitySession(
+  client: V1Client,
+  sessionId: string,
+  idempotencyKey = newIdempotencyKey(),
+) {
+  return client.request<ActivityCompleteResponse>(`/activity-sessions/${id(sessionId)}/complete`, {
+    body: {},
+    idempotencyKey,
+  });
+}
+
+export function cancelActivitySession(client: V1Client, sessionId: string) {
+  return client.request<void>(`/activity-sessions/${id(sessionId)}`, { method: 'DELETE' });
 }

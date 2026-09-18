@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { V1Error } from '../../../api/v1/client';
 import {
   categoryEmoji,
   categoryLabel,
+  createTopic,
   getCommunityStory,
   listStories,
   setRecommendation,
 } from '../../../api/v1/endpoints';
-import type { PublicStoryDetail, StorySummary } from '../../../api/v1/types';
+import type { PublicStoryDetail, StorySummary, TopicCategoryId } from '../../../api/v1/types';
 import { useAuth } from '../../../providers/AuthProvider';
 import { Icon } from '../components/Icon';
 import { CommunityReportForm } from '../components/CommunityParts';
@@ -289,24 +291,59 @@ export function ShareStoryScreen() {
   );
 }
 
+/** POST /topics 가 받는 기본 카테고리. 아이에게 보이는 이름과 서버 코드를 함께 둔다. */
+const TOPIC_CATEGORIES: { id: TopicCategoryId; label: string }[] = [
+  { id: 'SCIENCE', label: '과학' },
+  { id: 'MATH', label: '수학' },
+  { id: 'HISTORY', label: '역사' },
+  { id: 'IMAGINATION', label: '상상' },
+  { id: 'DAILY_LIFE', label: '내 일상' },
+  { id: 'FEELINGS', label: '마음' },
+];
+
 export function CustomTopicScreen() {
   const { toast } = useVillage();
+  const { client, status } = useAuth();
   const navigate = useNavigate();
   const [topic, setTopic] = useState('');
-  const [category, setCategory] = useState('과학');
+  const [category, setCategory] = useState<TopicCategoryId>('SCIENCE');
+  const [busy, setBusy] = useState(false);
+  const [refused, setRefused] = useState('');
   const examples = useMemo(
     () => ['공룡은 왜 사라졌을까?', '구름은 어떻게 만들어질까?', '친구와 다투면 어떻게 말할까?'],
     [],
   );
-  const start = () => {
-    if (!topic.trim()) {
+  // 주제를 먼저 만들고, 만들어진 topicId 로 대화를 시작한다.
+  // 예전에는 주소에 글자만 실어 보내서 대화 화면이 그대로 흘려보냈다.
+  const start = async () => {
+    const title = topic.trim();
+    if (!title) {
       toast('티키와 이야기할 주제를 적어 주세요.');
       return;
     }
-    toast(`“${topic.trim()}” 이야기를 준비했어요!`);
-    navigate(
-      `/talk?topic=${encodeURIComponent(topic.trim())}&category=${encodeURIComponent(category)}`,
-    );
+    if (status !== 'signedIn') {
+      navigate(`/login?next=${encodeURIComponent('/topics/new')}`);
+      return;
+    }
+    setBusy(true);
+    setRefused('');
+    try {
+      const created = await createTopic(client, { title, category });
+      toast(`“${created.topic.title}” 이야기를 준비했어요!`);
+      navigate(`/talk?topicId=${encodeURIComponent(created.topic.id)}`);
+    } catch (error) {
+      // 422 UNSAFE_TOPIC: 저장도 대화 생성도 하지 않는다. 이유를 다정하게 그대로 보여 준다.
+      if (error instanceof V1Error && error.code === 'UNSAFE_TOPIC')
+        setRefused(error.message || '그 주제로는 이야기하기 어려워요. 다른 주제를 골라 볼까요?');
+      else
+        setRefused(
+          error instanceof Error && error.message
+            ? error.message
+            : '주제를 준비하지 못했어요. 잠시 뒤에 다시 해 볼까요?',
+        );
+    } finally {
+      setBusy(false);
+    }
   };
   return (
     <>
@@ -342,19 +379,20 @@ export function CustomTopicScreen() {
           </div>
           <fieldset className="topic-categories">
             <legend>어떤 이야기와 가까워?</legend>
-            {['과학', '수학', '역사', '상상', '내 일상'].map((item) => (
+            {TOPIC_CATEGORIES.map((item) => (
               <button
                 type="button"
-                className={category === item ? 'selected' : ''}
-                onClick={() => setCategory(item)}
-                key={item}
+                className={category === item.id ? 'selected' : ''}
+                onClick={() => setCategory(item.id)}
+                key={item.id}
               >
-                {item}
+                {item.label}
               </button>
             ))}
           </fieldset>
-          <Button onClick={start}>
-            티키와 이야기 시작 <Icon name="arrow" />
+          {refused && <Notice variant="error">{refused}</Notice>}
+          <Button onClick={start} disabled={busy}>
+            {busy ? '주제를 준비하는 중…' : '티키와 이야기 시작'} <Icon name="arrow" />
           </Button>
         </section>
         <aside className="panel topic-inspiration">

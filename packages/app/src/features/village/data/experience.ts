@@ -1,29 +1,5 @@
-export const TODAY_TOPICS = [
-  {
-    id: 'ice-cup',
-    emoji: '🧊',
-    area: '과학',
-    title: '얼음물 컵에 물방울이 맺혔어!',
-    question: '컵 밖의 물은 어디서 왔을까?',
-    color: 'mint',
-  },
-  {
-    id: 'snow-hill',
-    emoji: '❄️',
-    area: '상상력',
-    title: '한여름의 눈썬매장',
-    question: '녹지 않는 눈이 있다면 무엇을 만들까?',
-    color: 'sky',
-  },
-  {
-    id: 'airplane',
-    emoji: '✈️',
-    area: '사고력',
-    title: '비행기는 왜 떨어지지 않을까?',
-    question: '자동차와 비행기는 무엇이 다를까?',
-    color: 'lavender',
-  },
-];
+// 단어 보관함·친구들의 이야기 화면이 아직 쓰는 목데이터. 홈의 오늘의 주제(TODAY_TOPICS)는
+// `GET /home` 추천과 `GET /topics` 로 바뀌어 지웠다.
 
 export const WORDS = [
   {

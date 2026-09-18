@@ -254,3 +254,207 @@ export interface HomeResponse {
   communityStories: unknown[];
   weeklyActivity: { conversationDays: number; completedStories: number };
 }
+
+// --- F1 홈·주제·활동 ---
+// 라이브 서버(`/openapi.json`)에서 확인한 모양이다. 명세와 다른 곳은 주석으로 남긴다.
+
+/** GET /home 의 미리보기 항목. 명세 10절은 빈 배열만 보여 준다. */
+export interface HomeRecentWord {
+  word: string;
+  meaning: string;
+}
+export interface HomeCommunityStoryPreview {
+  id: string;
+  title: string;
+}
+
+/** 목록 응답의 주제. 명세 11절 예시에 없는 `hook`(한 줄 소개)을 서버가 내려준다. */
+export interface TopicListItem extends Topic {
+  hook?: string | null;
+}
+
+/** GET /topics/{id}. 대표 질문 목록이 함께 온다. */
+export interface TopicDetail extends TopicListItem {
+  questions: string[];
+}
+
+/** POST /topics 가 받는 기본 카테고리. 사용자 카테고리 id 는 받지 않는다. */
+export type TopicCategoryId =
+  | 'SCIENCE'
+  | 'MATH'
+  | 'HISTORY'
+  | 'THINKING'
+  | 'DAILY_LIFE'
+  | 'NATURE'
+  | 'FEELINGS'
+  | 'IMAGINATION';
+
+export interface TopicCreateRequest {
+  title: string;
+  category: TopicCategoryId;
+}
+
+export interface TopicSafety {
+  allowed: boolean;
+  reason: string | null;
+}
+
+export interface TopicCreateResponse {
+  topic: { id: string; title: string; category: string; source: string };
+  safety: TopicSafety;
+}
+
+export interface TopicCategory {
+  id: string;
+  name: string;
+  kind: 'DEFAULT' | 'USER';
+  order: number;
+  /** 아이콘 이름(magnifier·puzzle·castle·lightbulb·book·star). */
+  visual: string;
+  /** 기본 카테고리는 false — 수정·삭제할 수 없다. */
+  editable: boolean;
+}
+
+export interface TopicCategoryCreateRequest {
+  name: string;
+  order?: number | null;
+}
+
+export interface TopicCategoryUpdateRequest {
+  name?: string | null;
+  order?: number | null;
+}
+
+// ---------- 생각 모험 활동 ----------
+
+export type ActivityTrack = 'forest' | 'lab' | 'theater';
+
+export interface ActivityItem {
+  id: string;
+  track: ActivityTrack;
+  /** 영역 표시(사고력 · 과학 · 수학 · 역사 · 인성) */
+  area: string;
+  /** 활동이 있는 곳의 이름 */
+  place: string;
+  title: string;
+  subtitle: string;
+  level: string;
+  tags: string[];
+  description: string;
+  estimatedMinutes: number;
+  /** 글쓰기 단계에서 공백을 뺀 최소 글자 수 */
+  minCharacters: number;
+}
+
+export interface ActivityVisuals {
+  kind: string;
+  icon: string;
+  color: string;
+  items: string[];
+}
+
+export interface ActivityDetail extends ActivityItem {
+  intro: string;
+  clue: string | null;
+  steps: string[];
+  questions: string[];
+  visuals: ActivityVisuals;
+}
+
+export interface ActivityAnswer {
+  question: string;
+  text: string;
+}
+
+export interface ActivityStep {
+  index: number;
+  label: string;
+  total: number;
+  /** 이 단계가 글쓰기 단계인가 */
+  writing: boolean;
+}
+
+/** 서버가 보관하는 초안. 로컬 Draft 와 같은 모양이라 그대로 비교할 수 있다. */
+export interface ActivityDraftState {
+  text: string;
+  answers: ActivityAnswer[];
+  followup: string;
+  hints: number;
+  lab: Record<string, unknown>;
+  theater: Record<string, unknown>;
+  inquiry: Record<string, unknown> | null;
+  path: Record<string, unknown> | null;
+}
+
+/** 지금 단계에서 아직 못 채운 조건. 아이에게 그대로 보여 줄 문장이 담겨 있다. */
+export interface MissingCondition {
+  code: string;
+  message: string;
+}
+
+export type ActivitySessionStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+
+export interface ActivitySession {
+  sessionId: string;
+  activityId: string;
+  track: ActivityTrack;
+  title: string;
+  status: ActivitySessionStatus;
+  /** 자동 저장 번호. PATCH 의 clientRevision 에 그대로 넣는다. */
+  revision: number;
+  step: ActivityStep;
+  minCharacters: number;
+  draft: ActivityDraftState;
+  missing: MissingCondition[];
+  readyToComplete: boolean;
+  storyId: string | null;
+  startedAt: string;
+  updatedAt: string;
+}
+
+export type ActivityEventType =
+  | 'TEXT'
+  | 'HINT'
+  | 'TOPIC'
+  | 'KEYWORD'
+  | 'LAB_VALUE'
+  | 'OBSERVATION'
+  | 'APPROVE'
+  | 'SCENE'
+  | 'CHOICE'
+  | 'EMOTION'
+  | 'INQUIRY'
+  | 'RUN';
+
+export interface ActivityEvent {
+  type: ActivityEventType;
+  /** OBSERVATION 은 LOW_LIGHT·HIGH_LIGHT·A·B 만 받는다. */
+  field?: string | null;
+  value?: unknown;
+}
+
+export interface ActivityStartRequest {
+  activityId: string;
+  /** 마음극장 활동의 마음 키워드 */
+  keyword?: string;
+}
+
+export interface ActivityPatchRequest {
+  clientRevision: number;
+  event: ActivityEvent;
+}
+
+export interface ActivityStory {
+  id: string;
+  title: string;
+  summary: string;
+  body: string;
+  category: string;
+  answers: ActivityAnswer[];
+  createdAt: string;
+}
+
+export interface ActivityCompleteResponse {
+  session: ActivitySession;
+  story: ActivityStory;
+}

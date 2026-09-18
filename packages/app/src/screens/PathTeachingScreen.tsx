@@ -2,8 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { reactTiki, teachTiki, useApiClient } from '../api';
-import type { PathTeachRequest, PathReactRequest } from '../api/path';
-import { useMutation } from '@tanstack/react-query';
 import { Icon } from '../components/Icon';
 import { GridWorld, PathRecordCard, ProgramView, useRunReplay } from '../components/PathParts';
 import { Button } from '../components/ui';
@@ -185,12 +183,6 @@ function Thread({
 function Play({ draft: d }: { draft: Draft }) {
   const { send, data, toast } = useVillage();
   const request = useApiClient();
-  const teaching = useMutation({
-    mutationFn: (body: PathTeachRequest) => teachTiki(request, body),
-  });
-  const { mutateAsync: react } = useMutation({
-    mutationFn: (body: PathReactRequest) => reactTiki(request, body),
-  });
   const q = d.path!;
   const map = currentMap(q);
   const run = lastRun(q);
@@ -198,7 +190,7 @@ function Play({ draft: d }: { draft: Draft }) {
   const replay = useRunReplay(shown);
   const [text, setText] = useState('');
   const [origin, setOrigin] = useState<InputOrigin>('adult');
-  const thinking = teaching.isPending;
+  const [thinking, setThinking] = useState(false);
   const [listening, setListening] = useState(false);
   const [predicting, setPredicting] = useState(false);
   const recognition = useRef<Recognition | null>(null);
@@ -245,7 +237,7 @@ function Play({ draft: d }: { draft: Draft }) {
       });
       speakLine([tikiLine, line].filter(Boolean).join(' '), tts);
     };
-    void react({
+    void reactTiki(request, {
       text: said,
       program: run.program,
       mapId: run.map.id,
@@ -265,47 +257,48 @@ function Play({ draft: d }: { draft: Draft }) {
       (r) => finish(r.tikiLine, r.question, r.source, r.challengeId, r.challengeLine),
       () => finish(fallbackReaction(run, index), null, 'fallback', null, null),
     );
-  }, [run, replay.done, q, react, send, origin, tts]);
+  }, [run, replay.done, q, request, send, origin, tts]);
 
   const say = (said: string, from: InputOrigin) => {
     const value = said.trim();
     if (!value || thinking) return;
+    setThinking(true);
     const pending = [...q.turns].reverse().find((t) => t.kind === 'clarify' && !t.chosen);
-    void teaching
-      .mutateAsync({
-        text: value,
-        program: q.program,
-        mapId: map.id,
-        attempt: q.runs.length,
-        inputOrigin: from,
-        pendingClarify: pending?.clarify
-          ? { question: pending.clarify.question, chosen: value }
-          : null,
-      })
-      .then(
-        (r) => {
-          setText('');
-          const turn: PathTurn = {
-            id: `turn-${Date.now().toString(36)}`,
-            text: value,
-            origin: from,
-            kind: r.kind,
-            heard: r.heard.slice(0, 4),
-            tikiLine: r.tikiLine,
-            source: r.source,
-            clarify:
-              r.kind === 'clarify' && r.clarify
-                ? { ...r.clarify, options: r.clarify.options.filter((o) => isProgram(o.program)) }
-                : null,
-            chosen: null,
-          };
-          send({ type: 'path-teach', turn, program: r.kind === 'program' ? r.program : null });
-          speakLine(r.tikiLine + (r.clarify ? ` ${r.clarify.question}` : ''), tts);
-        },
-        () => {
-          toast('티키와 연결하지 못했어요. 잠시 뒤에 다시 말해 줘.');
-        },
-      );
+    void teachTiki(request, {
+      text: value,
+      program: q.program,
+      mapId: map.id,
+      attempt: q.runs.length,
+      inputOrigin: from,
+      pendingClarify: pending?.clarify
+        ? { question: pending.clarify.question, chosen: value }
+        : null,
+    }).then(
+      (r) => {
+        setThinking(false);
+        setText('');
+        const turn: PathTurn = {
+          id: `turn-${Date.now().toString(36)}`,
+          text: value,
+          origin: from,
+          kind: r.kind,
+          heard: r.heard.slice(0, 4),
+          tikiLine: r.tikiLine,
+          source: r.source,
+          clarify:
+            r.kind === 'clarify' && r.clarify
+              ? { ...r.clarify, options: r.clarify.options.filter((o) => isProgram(o.program)) }
+              : null,
+          chosen: null,
+        };
+        send({ type: 'path-teach', turn, program: r.kind === 'program' ? r.program : null });
+        speakLine(r.tikiLine + (r.clarify ? ` ${r.clarify.question}` : ''), tts);
+      },
+      () => {
+        setThinking(false);
+        toast('티키와 연결하지 못했어요. 잠시 뒤에 다시 말해 줘.');
+      },
+    );
   };
 
   const listen = () => {

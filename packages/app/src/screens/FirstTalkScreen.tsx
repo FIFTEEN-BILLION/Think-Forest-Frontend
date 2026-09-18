@@ -1,24 +1,38 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Button } from '../components/ui';
+import {
+  buildMessageRequest,
+  canFinish,
+  classifySendError,
+  FIRST_GREETING_FIELDS,
+  mergeMessages,
+  profileDraftChips,
+  progressValue,
+  safeReturnTo,
+  toLocalProfile,
+} from '../api/v1/chat';
+import { newIdempotencyKey, V1Error } from '../api/v1/client';
+import {
+  completeFirstGreeting,
+  getFirstGreeting,
+  sendFirstGreetingMessage,
+  startFirstGreeting,
+} from '../api/v1/endpoints';
+import type {
+  ChatMessage,
+  FirstGreetingCompletion,
+  FirstGreetingReadiness,
+  FirstGreetingSession,
+  NextInteraction,
+  ProfileDraft,
+  SendMessageRequest,
+  SessionStatus,
+} from '../api/v1/types';
+import { useAuth } from '../providers/AuthProvider';
+import { Button, Notice } from '../components/ui';
 import { Icon } from '../components/Icon';
+import { ChatThread, ChoiceButtons, ReadinessBar, useSpeechInput } from '../components/ServerChat';
 import { useVillage } from '../providers/VillageProvider';
-import { safeNext } from '../lib/navigation';
-
-type Field = 'intro' | 'name' | 'grade' | 'interests' | 'detail' | 'goal' | 'confirm';
-type Message = { id: string; role: 'tiki' | 'child'; text: string };
-type DraftProfile = { name: string; grade: string; likes: string[]; detail: string; goal: string };
-type SpeechEvent = { results: ArrayLike<{ 0: { transcript: string } }> };
-type Recognition = {
-  lang: string;
-  interimResults: boolean;
-  continuous: boolean;
-  start(): void;
-  stop(): void;
-  onresult: ((event: SpeechEvent) => void) | null;
-  onend: (() => void) | null;
-  onerror: (() => void) | null;
-};
 
 const interestOptions = [
   ['🦕', '공룡'],
@@ -37,215 +51,191 @@ const goalOptions = [
   '내 생각을 길게 표현하기',
 ];
 
-const clean = (value: string) => value.trim().replace(/[.!?~]+$/, '');
-function extractIntro(text: string, current: DraftProfile): DraftProfile {
-  const source = clean(text);
-  const name =
-    source.match(/(?:이름은|별명은|나를)\s*([\uAC00-\uD7A3A-Za-z0-9]{1,10})/)?.[1] ??
-    source.match(/나는\s*([\uAC00-\uD7A3]{2,6})(?:이야|야|라고)/)?.[1] ??
-    current.name;
-  const school =
-    source.match(/([\uAC00-\uD7A3A-Za-z0-9]+(?:초등학교|중학교|유치원|학교|초))/)?.[1] ?? '';
-  const grade = source.match(/(\d\s*학년)/)?.[1]?.replace(/\s/g, '') ?? '';
-  const age = source.match(/(\d{1,2}살)/)?.[1] ?? '';
-  const foundLikes = interestOptions
-    .map(([, label]) => label)
-    .filter((label) => source.includes(label));
-  const goal = goalOptions.find((option) => {
-    if (option.includes('이유')) return source.includes('이유');
-    if (option.includes('질문')) return source.includes('질문');
-    if (option.includes('자세히')) return source.includes('관찰') || source.includes('자세히');
-    return source.includes('길게') || source.includes('표현');
-  });
-  return {
-    ...current,
-    name: name || '',
-    grade: [school, grade || age].filter(Boolean).join(' ') || current.grade,
-    likes: [...new Set([...current.likes, ...foundLikes])],
-    goal: goal ?? current.goal,
-  };
-}
-function nextMissing(profile: DraftProfile): Field {
-  if (!profile.name) return 'name';
-  if (
-    !profile.grade ||
-    !/(학교|초|중|유치원)/.test(profile.grade) ||
-    !/(학년|살)/.test(profile.grade)
-  )
-    return 'grade';
-  if (!profile.likes.length) return 'interests';
-  if (!profile.detail) return 'detail';
-  if (!profile.goal) return 'goal';
-  return 'confirm';
-}
-function questionFor(field: Field, profile: DraftProfile) {
-  if (field === 'name') return '너를 어떻게 부르면 좋을지 알려 줄래? 진짜 이름이 아닌 별명도 좋아.';
-  if (field === 'grade')
-    return `${profile.name}아, 어디에서 어느 학년 생활을 하고 있어? “새봄초등학교 2학년이야”처럼 말해 줘.`;
-  if (field === 'interests')
-    return `${profile.name}는 요즘 무엇을 가장 좋아해? 여러 개를 알려 줘도 좋아!`;
-  if (field === 'detail')
-    return `${profile.likes[0]}을 좋아하는구나! 그중에서도 무엇이 제일 좋은지, 왜 좋은지 더 이야기해 줄래?`;
-  if (field === 'goal')
-    return `${profile.detail ? `“${profile.detail}”라고 말한 부분이 재미있다! ` : ''}앞으로 나와 이야기하며 어떤 힘을 키워 보고 싶어?`;
-  return `좋아, ${profile.name}에 대해 이렇게 이해했어. 내가 잘 기억했는지 함께 확인해 볼까?`;
-}
+type SessionView = {
+  sessionId: string;
+  status: SessionStatus;
+  messages: ChatMessage[];
+  profileDraft: ProfileDraft;
+  readiness: FirstGreetingReadiness;
+  interaction: NextInteraction | null;
+};
+type Pending = { request: SendMessageRequest; text: string; failed: boolean };
+
+const fromSession = (session: FirstGreetingSession): SessionView => ({
+  sessionId: session.sessionId,
+  status: session.status,
+  messages: mergeMessages([], session.messages),
+  profileDraft: session.profileDraft,
+  readiness: session.readiness,
+  interaction: session.currentInteraction ?? null,
+});
 
 export function FirstTalkScreen() {
   const { update, toast } = useVillage();
+  const { client, updateUser } = useAuth();
   const navigate = useNavigate();
   const [params] = useSearchParams();
-  const [field, setField] = useState<Field>('intro');
+  const [session, setSession] = useState<SessionView | null>(null);
+  const [loadError, setLoadError] = useState('');
   const [input, setInput] = useState('');
-  const [selectedLikes, setSelectedLikes] = useState<string[]>([]);
-  const [listening, setListening] = useState(false);
-  const [profile, setProfile] = useState<DraftProfile>({
-    name: '',
-    grade: '',
-    likes: [],
-    detail: '',
-    goal: '',
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [sending, setSending] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [completing, setCompleting] = useState(false);
+  const [completion, setCompletion] = useState<FirstGreetingCompletion | null>(null);
+  // StrictMode 에서 effect 가 두 번 돌아도 같은 키라 세션이 하나만 생긴다.
+  const startKey = useRef(newIdempotencyKey());
+  const completeKey = useRef(newIdempotencyKey());
+  const { listening, listen } = useSpeechInput(setInput, toast, undefined, {
+    questionId: session?.interaction?.questionId,
   });
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'hello',
-      role: 'tiki',
-      text: '안녕! 난 네 생각친구 티키야. 나한테 너를 자유롭게 소개해 볼래? 어떻게 부르면 좋은지, 어디에 다니는지, 무엇을 좋아하는지처럼 말하고 싶은 것부터 이야기해 줘!',
-    },
-  ]);
-  const recognition = useRef<Recognition | null>(null);
-  const threadRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => () => recognition.current?.stop(), []);
+
+  const applyLoad = useCallback(
+    (request: Promise<FirstGreetingSession>, isActive: () => boolean = () => true) =>
+      request.then(
+        (loaded) => {
+          if (!isActive()) return;
+          setLoadError('');
+          setSession(fromSession(loaded));
+        },
+        (error: unknown) => {
+          // 401 은 가드가 로그인 화면으로 보낸다.
+          if (!isActive() || (error instanceof V1Error && error.status === 401)) return;
+          setLoadError(error instanceof Error ? error.message : '티키를 부르지 못했어요.');
+        },
+      ),
+    [],
+  );
+  // 시작하거나 진행 중인 첫인사를 이어서 불러온다.
   useEffect(() => {
-    threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: 'smooth' });
-  }, [messages]);
-  const addExchange = (answer: string, nextProfile: DraftProfile, nextField: Field) => {
-    setMessages((current) => [
-      ...current,
-      { id: `child-${current.length}`, role: 'child', text: answer },
-      { id: `tiki-${current.length + 1}`, role: 'tiki', text: questionFor(nextField, nextProfile) },
-    ]);
-    setProfile(nextProfile);
-    setField(nextField);
-    setInput('');
-    setSelectedLikes([]);
-  };
-  const submit = () => {
-    if (field === 'confirm') {
-      update((previous) => ({
-        ...previous,
-        profile: {
-          name: profile.name,
-          grade: profile.grade,
-          interests: [...profile.likes, profile.detail].filter(Boolean),
-          goal: profile.goal,
-        },
-        consent: {
-          ...previous.consent,
-          done: true,
-          guardian: '보호자 계정과 연결',
-          noticeAt: new Date().toISOString(),
-        },
-        onboarding: { ...previous.onboarding, step: 4, acknowledged: true, childPolicy: true },
-      }));
-      toast(`${profile.name}와 티키가 친구가 됐어요!`);
-      navigate(safeNext(params.get('next'), '/talk'));
-      return;
+    let active = true;
+    void applyLoad(startFirstGreeting(client, startKey.current), () => active);
+    return () => {
+      active = false;
+    };
+  }, [client, applyLoad]);
+  const retryLoad = () => applyLoad(startFirstGreeting(client, startKey.current));
+
+  /** 질문이 바뀌었거나 세션이 사라졌을 때 서버 상태로 다시 맞춘다. */
+  const reload = async (sessionId: string) => {
+    try {
+      setSession(fromSession(await getFirstGreeting(client, sessionId)));
+    } catch {
+      startKey.current = newIdempotencyKey();
+      await retryLoad();
     }
-    const answer =
-      field === 'interests'
-        ? [...selectedLikes, clean(input)].filter(Boolean).join(', ')
-        : clean(input);
-    if (!answer) {
+  };
+
+  const finish = (result: FirstGreetingCompletion) => {
+    update((previous) => ({
+      ...previous,
+      profile: toLocalProfile(result.profile, previous.profile),
+      consent: {
+        ...previous.consent,
+        done: true,
+        guardian: '보호자 계정과 연결',
+        noticeAt: new Date().toISOString(),
+      },
+      // step is 0..3 in storage decode; 4 would make the saved data unreadable after reload.
+      onboarding: { ...previous.onboarding, step: 3, acknowledged: true, childPolicy: true },
+    }));
+    updateUser({ needsFirstGreeting: false });
+    setSession((current) => (current ? { ...current, status: 'COMPLETED' } : current));
+    setCompletion(result);
+  };
+
+  const send = async (request: SendMessageRequest, text: string) => {
+    if (!session) return;
+    setSending(true);
+    setNotice('');
+    setPending({ request, text, failed: false });
+    try {
+      const response = await sendFirstGreetingMessage(client, session.sessionId, request);
+      setSession((current) =>
+        current
+          ? {
+              ...current,
+              messages: mergeMessages(current.messages, [
+                response.userMessage,
+                response.assistantMessage,
+              ]),
+              profileDraft: response.profileDraft,
+              readiness: response.readiness,
+              status: response.status,
+              interaction: response.nextInteraction,
+            }
+          : current,
+      );
+      setPending(null);
+      setInput('');
+      if (response.completion) finish(response.completion);
+    } catch (error) {
+      const failure = classifySendError(error);
+      setNotice(failure.kind === 'signin' ? '' : failure.message);
+      if (failure.kind === 'retry' || failure.kind === 'wait') {
+        // 같은 clientMessageId 로 다시 보낼 수 있게 남겨 둔다.
+        setPending({ request, text, failed: true });
+      } else {
+        setPending(null);
+        if (failure.kind === 'reload') await reload(session.sessionId);
+      }
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const submit = () => {
+    const text = input.trim();
+    if (!text) {
       toast('티키에게 하고 싶은 말을 알려 줘!');
       return;
     }
-    let next = { ...profile };
-    if (field === 'intro') next = extractIntro(answer, profile);
-    if (field === 'name') next.name = answer;
-    if (field === 'grade') next.grade = answer;
-    if (field === 'interests')
-      next.likes = [
-        ...new Set([
-          ...selectedLikes,
-          ...interestOptions.map(([, label]) => label).filter((label) => answer.includes(label)),
-          ...(input && !interestOptions.some(([, label]) => input.includes(label))
-            ? [clean(input)]
-            : []),
-        ]),
-      ];
-    if (field === 'detail') next.detail = answer;
-    if (field === 'goal') next.goal = answer;
-    const nextField = nextMissing(next);
-    const found =
-      field === 'intro'
-        ? [
-            next.name && `${next.name}라고 부르면 되는구나`,
-            next.grade && `${next.grade}에서 생활하고 있고`,
-            next.likes.length && `${next.likes.join(', ')}을 좋아하네`,
-          ]
-            .filter(Boolean)
-            .join('. ')
-        : '';
-    const acknowledgedProfile = next;
-    if (found) {
-      setMessages((current) => [
-        ...current,
-        { id: `child-${current.length}`, role: 'child', text: answer },
-        {
-          id: `tiki-ack-${current.length}`,
-          role: 'tiki',
-          text: `${found}! 잘 기억할게. ${questionFor(nextField, acknowledgedProfile)}`,
-        },
-      ]);
-      setProfile(next);
-      setField(nextField);
-      setInput('');
+    if (pending?.failed && pending.text === text) {
+      void send(pending.request, text);
       return;
     }
-    addExchange(answer, next, nextField);
+    const request = buildMessageRequest(newIdempotencyKey(), session?.interaction, { text });
+    if (request) void send(request, text);
   };
-  const listen = () => {
-    const speechWindow = window as typeof window & {
-      SpeechRecognition?: new () => Recognition;
-      webkitSpeechRecognition?: new () => Recognition;
-    };
-    const SpeechRecognition =
-      speechWindow.SpeechRecognition ?? speechWindow.webkitSpeechRecognition;
-    setListening(true);
-    if (!SpeechRecognition) {
-      window.setTimeout(() => {
-        setInput(
-          field === 'intro'
-            ? '나는 지우야. 새봄초등학교 2학년이고 공룡을 정말 좋아해!'
-            : '내 생각을 이유와 함께 길게 말하고 싶어.',
-        );
-        setListening(false);
-      }, 1200);
-      return;
+  const choose = (optionId: string) => {
+    const option = session?.interaction?.options.find((item) => item.id === optionId);
+    const request = buildMessageRequest(newIdempotencyKey(), session?.interaction, { optionId });
+    if (request && option) void send(request, option.label);
+  };
+
+  const complete = async () => {
+    if (!session) return;
+    setCompleting(true);
+    setNotice('');
+    try {
+      finish(await completeFirstGreeting(client, session.sessionId, 'BUTTON', completeKey.current));
+    } catch (error) {
+      const failure = classifySendError(error);
+      // 일시 실패만 같은 키로 다시 시도한다. 그 밖의 응답은 새 키로 다시 판단받는다.
+      if (failure.kind !== 'retry') completeKey.current = newIdempotencyKey();
+      if (failure.kind === 'reload') await reload(session.sessionId);
+      if (failure.kind !== 'signin') setNotice(failure.message);
+    } finally {
+      setCompleting(false);
     }
-    const instance = new SpeechRecognition();
-    recognition.current = instance;
-    instance.lang = 'ko-KR';
-    instance.interimResults = true;
-    instance.continuous = false;
-    instance.onresult = (event) =>
-      setInput(
-        Array.from(event.results)
-          .map((result) => result[0].transcript)
-          .join(''),
-      );
-    instance.onend = () => setListening(false);
-    instance.onerror = () => {
-      setListening(false);
-      toast('음성을 듣지 못했어요. 글로 써도 괜찮아요.');
-    };
-    instance.start();
   };
+
+  const addSuggestion = (text: string) =>
+    setInput((current) => (current.includes(text) ? current : `${current} ${text}`.trim()));
+
+  const draft = session?.profileDraft;
+  const name = draft?.nickname || completion?.profile.nickname || '나';
+  const progress = completion ? 100 : progressValue(session?.readiness);
+  const chips = profileDraftChips(draft);
+  const nextMissing = session?.readiness.missing[0];
+  const busy = sending || completing;
+  const ready = session ? canFinish(session.readiness, session.status) : false;
+  const choice = session?.interaction?.type === 'SINGLE_CHOICE' ? session.interaction : null;
+
   return (
     <div className="first-talk-page adaptive-intro">
       <header className="first-talk-head">
-        <Link to="/" className="icon-btn">
+        <Link to="/" className="icon-btn" aria-label="홈으로">
           <Icon name="close" />
         </Link>
         <div>
@@ -259,14 +249,27 @@ export function FirstTalkScreen() {
           <div className="first-buddy-face">🌱</div>
           <strong>생각친구 티키</strong>
           <p>{listening ? '네 이야기를 듣는 중…' : '네가 말한 것을 잘 기억할게!'}</p>
+          <ReadinessBar value={progress} label="티키가 너를 알아 가는 정도" />
           <div className="extract-status">
-            <span className={profile.name ? 'done' : ''}>별명 {profile.name && '✓'}</span>
-            <span className={profile.grade ? 'done' : ''}>소속·학년 {profile.grade && '✓'}</span>
-            <span className={profile.likes.length ? 'done' : ''}>
-              좋아하는 것 {profile.likes.length > 0 && '✓'}
-            </span>
-            <span className={profile.goal ? 'done' : ''}>키우고 싶은 힘 {profile.goal && '✓'}</span>
+            {FIRST_GREETING_FIELDS.map((field) => {
+              const done =
+                !!completion || (!!session && !session.readiness.missing.includes(field.key));
+              return (
+                <span className={done ? 'done' : ''} key={field.key}>
+                  {field.label}
+                </span>
+              );
+            })}
           </div>
+          {chips.length > 0 && (
+            <div className="draft-chips" aria-label="티키가 기억한 것">
+              {chips.map((chip) => (
+                <span className="chip" key={chip.key} title={chip.label}>
+                  {chip.value}
+                </span>
+              ))}
+            </div>
+          )}
         </section>
         <section className="first-chat">
           <div className="chat-title">
@@ -279,117 +282,147 @@ export function FirstTalkScreen() {
             </div>
             <span className="online-dot">지금 접속 중</span>
           </div>
-          <div
-            className="first-conversation-thread adaptive-thread"
-            ref={threadRef}
-            aria-live="polite"
-          >
-            {messages.map((message) =>
-              message.role === 'tiki' ? (
-                <div className="chat-message ai-message" key={message.id}>
-                  <span className="message-avatar">🌱</span>
-                  <div>
-                    <span className="message-name">티키</span>
-                    <div className="first-message-copy">
-                      <p>{message.text}</p>
-                    </div>
+          {!session ? (
+            <div className="first-conversation-thread adaptive-thread" role="status">
+              {loadError ? (
+                <Notice variant="error">
+                  {loadError}
+                  <div className="actions">
+                    <Button className="light small" onClick={() => void retryLoad()}>
+                      다시 불러오기
+                    </Button>
                   </div>
-                </div>
+                </Notice>
               ) : (
-                <div className="chat-message child-message" key={message.id}>
-                  <div>
-                    <span className="message-name">{profile.name || '나'}</span>
-                    <p>{message.text}</p>
-                  </div>
-                  <span className="message-avatar child-avatar">
-                    {(profile.name || '나').slice(0, 1)}
-                  </span>
-                </div>
-              ),
-            )}
-          </div>
-          {field === 'confirm' ? (
+                <p className="muted">티키를 부르고 있어요…</p>
+              )}
+            </div>
+          ) : (
+            <ChatThread
+              variant="first"
+              messages={session.messages}
+              childName={name}
+              pendingText={pending?.text}
+              pendingFailed={pending?.failed}
+              thinking={sending}
+            />
+          )}
+          {completion ? (
             <div className="first-answer">
               <div className="profile-confirm">
-                <span className="profile-confirm-avatar">{profile.name.slice(0, 1) || '🌱'}</span>
+                <span className="profile-confirm-avatar">{name.slice(0, 1) || '🌱'}</span>
                 <div>
-                  <strong>{profile.name}의 생각 프로필</strong>
-                  <p>{profile.grade}</p>
+                  <strong>{name}의 생각 프로필</strong>
+                  <p>{completion.profile.gradeOrAgeBand}</p>
                 </div>
                 <dl>
                   <dt>좋아하는 것</dt>
-                  <dd>{profile.likes.join(' · ')}</dd>
+                  <dd>{completion.profile.interests.join(' · ')}</dd>
                   <dt>더 알게 된 것</dt>
-                  <dd>{profile.detail}</dd>
+                  <dd>{completion.profile.interestDetails.join(' · ')}</dd>
                   <dt>키우고 싶은 힘</dt>
-                  <dd>{profile.goal}</dd>
+                  <dd>{completion.profile.growthGoal}</dd>
                 </dl>
+                {completion.summary && <p>{completion.summary}</p>}
               </div>
             </div>
           ) : (
-            <div className="adaptive-composer">
-              {field === 'interests' && (
-                <div className="intro-suggestions">
-                  {interestOptions.map(([emoji, label]) => (
-                    <button
-                      className={selectedLikes.includes(label) ? 'selected' : ''}
-                      onClick={() =>
-                        setSelectedLikes((current) =>
-                          current.includes(label)
-                            ? current.filter((item) => item !== label)
-                            : [...current, label],
-                        )
-                      }
-                      key={label}
-                    >
-                      {emoji} {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-              {field === 'goal' && (
-                <div className="goal-suggestions">
-                  {goalOptions.map((option) => (
-                    <button onClick={() => setInput(option)} key={option}>
-                      {option}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className={`intro-input ${listening ? 'is-listening' : ''}`}>
-                <textarea
-                  autoFocus
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  placeholder={
-                    field === 'intro'
-                      ? '예: 나는 지우야. 2학년이고 공룡을 좋아해!'
-                      : '티키에게 편하게 말해 줘…'
-                  }
-                />
-                <button
-                  className={listening ? 'active' : ''}
-                  onClick={listen}
-                  aria-label="음성으로 말하기"
-                >
-                  <Icon name={listening ? 'pause' : 'mic'} />
-                </button>
+            session && (
+              <div className="adaptive-composer">
+                {notice && (
+                  <div role="alert">
+                    <Notice variant="error">{notice}</Notice>
+                  </div>
+                )}
+                {choice ? (
+                  <ChoiceButtons options={choice.options} disabled={busy} onChoose={choose} />
+                ) : (
+                  <>
+                    {nextMissing === 'INTEREST' && (
+                      <div className="intro-suggestions">
+                        {interestOptions.map(([emoji, label]) => (
+                          <button
+                            type="button"
+                            className={input.includes(label) ? 'selected' : ''}
+                            onClick={() => addSuggestion(label)}
+                            key={label}
+                          >
+                            {emoji} {label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {nextMissing === 'GROWTH_GOAL' && (
+                      <div className="goal-suggestions">
+                        {goalOptions.map((option) => (
+                          <button type="button" onClick={() => setInput(option)} key={option}>
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className={`intro-input ${listening ? 'is-listening' : ''}`}>
+                      <textarea
+                        autoFocus
+                        value={input}
+                        maxLength={1000}
+                        onChange={(event) => setInput(event.target.value)}
+                        placeholder={
+                          session.messages.length <= 1
+                            ? '예: 나는 지우야. 2학년이고 공룡을 좋아해!'
+                            : '티키에게 편하게 말해 줘…'
+                        }
+                      />
+                      <button
+                        type="button"
+                        className={listening ? 'active' : ''}
+                        onClick={listen}
+                        aria-label="음성으로 말하기"
+                      >
+                        <Icon name={listening ? 'pause' : 'mic'} />
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
-            </div>
+            )
           )}
           <div className="conversation-actions">
-            <span className="adaptive-help">
-              {field === 'confirm'
-                ? '설정에서 언제든 바꿀 수 있어요.'
-                : '길게 말해도, 짧게 말해도 괜찮아요.'}
-            </span>
-            <Button
-              disabled={field !== 'confirm' && !input.trim() && !selectedLikes.length}
-              onClick={submit}
-            >
-              {field === 'confirm' ? '응, 맞아! 첫 이야기 시작' : '티키에게 말하기'}{' '}
-              <Icon name="arrow" />
-            </Button>
+            {completion ? (
+              <>
+                <span className="adaptive-help">설정에서 언제든 바꿀 수 있어요.</span>
+                <Button onClick={() => navigate(safeReturnTo(params.get('next'), '/talk'))}>
+                  좋아! 첫 이야기 시작 <Icon name="arrow" />
+                </Button>
+              </>
+            ) : (
+              <>
+                <span className="adaptive-help">
+                  {ready
+                    ? '티키가 너를 잘 알게 됐어요. 더 이야기해도 좋아요.'
+                    : '길게 말해도, 짧게 말해도 괜찮아요.'}
+                </span>
+                <Button
+                  className="light"
+                  disabled={!ready || busy}
+                  onClick={() => void complete()}
+                  title={ready ? undefined : '조금 더 이야기하면 마칠 수 있어요'}
+                >
+                  {completing ? '정리하는 중…' : '첫인사 마치기'}
+                </Button>
+                {!choice && (
+                  <Button
+                    disabled={!session || busy || listening || !input.trim()}
+                    onClick={submit}
+                  >
+                    {pending?.failed && pending.text === input.trim()
+                      ? '다시 보내기'
+                      : '티키에게 말하기'}{' '}
+                    <Icon name="arrow" />
+                  </Button>
+                )}
+              </>
+            )}
           </div>
         </section>
       </div>

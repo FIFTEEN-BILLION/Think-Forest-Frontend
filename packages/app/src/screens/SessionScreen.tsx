@@ -18,6 +18,12 @@ import {
 import { guard, hasObservations, scoreAnswers } from '../lib/learning';
 import { useVillage } from '../providers/VillageProvider';
 import type { Draft } from '../types/village';
+import {
+  ActivitySessionNotice,
+  useActivityFlow,
+  usesServerSession,
+} from '../components/ActivitySessionBar';
+import type { ActivityFlow } from '../components/ActivitySessionBar';
 import { useStepFocus } from '../hooks/useStepFocus';
 import { InquiryScreen } from './InquiryScreen';
 import { PathTeachingScreen } from './PathTeachingScreen';
@@ -27,6 +33,8 @@ export function SessionScreen() {
   const { data, storageError } = useVillage();
   const { track } = useParams();
   const d = data.resume;
+  // 로그인했으면 서버 세션이 단계 조건과 완료 판정을 맡는다. 아니면 지금까지처럼 이 기기에서만 진행한다.
+  const flow = useActivityFlow(d && usesServerSession(d) ? d : null);
   useStepFocus(d?.step);
   if (!data.consent.done) return <Navigate to="/first-talk" replace />;
   if (!d)
@@ -52,7 +60,11 @@ export function SessionScreen() {
         </Link>
         <span className="autosave">
           <Icon name="check" />
-          {storageError ? '기기 저장 상태를 확인해 주세요' : '작성 내용 자동 저장'}
+          {storageError
+            ? '기기 저장 상태를 확인해 주세요'
+            : flow.linked
+              ? '서버와 이 기기에 자동 저장'
+              : '작성 내용 자동 저장'}
         </span>
       </div>
       <PageHeading
@@ -62,38 +74,49 @@ export function SessionScreen() {
       />
       <Steps labels={PLACES[d.track].steps} current={d.step} />
       {d.track === 'forest' ? (
-        <ForestFlow draft={d} />
+        <ForestFlow draft={d} flow={flow} />
       ) : d.track === 'lab' ? (
-        <LabFlow draft={d} />
+        <LabFlow draft={d} flow={flow} />
       ) : (
-        <TheaterFlow key={d.id} draft={d} />
+        <TheaterFlow key={d.id} draft={d} flow={flow} />
       )}
     </>
   );
 }
-function NextButton({ draft, children }: { draft: Draft; children: string }) {
-  const { send } = useVillage();
+// 화면의 비활성화는 도움말일 뿐이다. 실제 단계 이동은 서버가 조건을 다시 검사한 뒤에 일어난다.
+function NextButton({
+  draft,
+  flow,
+  children,
+}: {
+  draft: Draft;
+  flow: ActivityFlow;
+  children: string;
+}) {
   const error = guard(draft);
   return (
     <div className="advance-area">
-      <Button disabled={Boolean(error)} onClick={() => send({ type: 'advance' })}>
-        {children}
+      <Button disabled={Boolean(error) || flow.busy} onClick={flow.advance}>
+        {flow.busy ? '확인하는 중…' : children}
         <Icon name="arrow" />
       </Button>
       {error && <small className="muted">{error}</small>}
+      <ActivitySessionNotice flow={flow} />
     </div>
   );
 }
 function WritingPanel({
   draft,
+  flow,
   question,
   followup = false,
 }: {
   draft: Draft;
+  flow: ActivityFlow;
   question: string;
   followup?: boolean;
 }) {
-  const { send } = useVillage();
+  const send = flow.send;
   return (
     <section className="coach">
       <div className="coach-head">
@@ -120,14 +143,15 @@ function WritingPanel({
         <Button className="ghost" onClick={() => send({ type: 'hint' })}>
           쓰기 도움
         </Button>
-        <NextButton draft={draft}>내 문장 남기고 다음 단계</NextButton>
+        <NextButton draft={draft} flow={flow}>
+          내 문장 남기고 다음 단계
+        </NextButton>
       </div>
       <Provenance />
     </section>
   );
 }
-function Review({ draft }: { draft: Draft }) {
-  const { finish } = useVillage();
+function Review({ draft, flow }: { draft: Draft; flow: ActivityFlow }) {
   const navigate = useNavigate();
   return (
     <div className="center panel">
@@ -148,25 +172,25 @@ function Review({ draft }: { draft: Draft }) {
       <Provenance />
       <div className="actions">
         <Button
-          onClick={() => {
-            const id = finish();
-            if (id) navigate(`/complete/${id}`, { replace: true });
-          }}
+          disabled={flow.busy}
+          // 서버가 책장 기록을 만든 뒤에 이 기기 기록도 남기고 완료 화면으로 간다.
+          onClick={() => flow.complete((id) => navigate(`/complete/${id}`, { replace: true }))}
         >
-          내 모험을 책장에 남기기
+          {flow.busy ? '책장에 남기는 중…' : '내 모험을 책장에 남기기'}
           <Icon name="book" />
         </Button>
+        <ActivitySessionNotice flow={flow} />
       </div>
     </div>
   );
 }
-function ForestFlow({ draft: d }: { draft: Draft }) {
+function ForestFlow({ draft: d, flow }: { draft: Draft; flow: ActivityFlow }) {
   const f = FORESTS[d.activityId];
   if (!f)
     return (
       <EmptyState title="이야기를 찾지 못했어요." description="모험 목록에서 다시 골라 주세요." />
     );
-  if (d.step === 4) return <Review draft={d} />;
+  if (d.step === 4) return <Review draft={d} flow={flow} />;
   return (
     <div className="learning-grid">
       <article className="story-card">
@@ -213,19 +237,27 @@ function ForestFlow({ draft: d }: { draft: Draft }) {
           <Notice>
             내가 직접 확인한 것과 추측을 나누어 생각해요. 다음 화면에서 첫 문장을 남겨요.
           </Notice>
-          <NextButton draft={d}>장면을 읽었어요, 내 생각 꺼내기</NextButton>
+          <NextButton draft={d} flow={flow}>
+            장면을 읽었어요, 내 생각 꺼내기
+          </NextButton>
           <Provenance />
         </section>
       ) : (
-        <WritingPanel draft={d} question={f.questions[d.step - 1] ?? ''} followup={d.step > 1} />
+        <WritingPanel
+          draft={d}
+          flow={flow}
+          question={f.questions[d.step - 1] ?? ''}
+          followup={d.step > 1}
+        />
       )}
     </div>
   );
 }
-function LabFlow({ draft: d }: { draft: Draft }) {
-  const { update, send } = useVillage();
+function LabFlow({ draft: d, flow }: { draft: Draft; flow: ActivityFlow }) {
+  const { update } = useVillage();
+  const send = flow.send;
   const lab = d.lab;
-  if (d.step === 5) return <Review draft={d} />;
+  if (d.step === 5) return <Review draft={d} flow={flow} />;
   if (d.step === 0)
     return (
       <div className="learning-grid">
@@ -286,7 +318,9 @@ function LabFlow({ draft: d }: { draft: Draft }) {
               ? '활동지는 사실을 만들어 주지 않아요. 확인하지 못한 출처와 사실은 빈칸으로 남겨요.'
               : '관찰 원리를 표현한 단순 모형이에요. 화면의 숫자는 실제 측정 결과가 아니에요.'}
           </Notice>
-          <NextButton draft={d}>활동 준비하고 예상해 보기</NextButton>
+          <NextButton draft={d} flow={flow}>
+            활동 준비하고 예상해 보기
+          </NextButton>
           <Provenance />
         </section>
       </div>
@@ -313,7 +347,11 @@ function LabFlow({ draft: d }: { draft: Draft }) {
             예상은 맞히는 문제가 아니에요. 나중에 관찰한 결과와 비교하기 위한 첫 문장이에요.
           </Notice>
         </section>
-        <WritingPanel draft={d} question="어떻게 될 것 같나요? 그 이유도 적어 보세요." />
+        <WritingPanel
+          draft={d}
+          flow={flow}
+          question="어떻게 될 것 같나요? 그 이유도 적어 보세요."
+        />
       </div>
     );
   if (d.step === 2)
@@ -395,7 +433,7 @@ function LabFlow({ draft: d }: { draft: Draft }) {
               </small>
             </div>
           )}
-          <NextButton draft={d}>
+          <NextButton draft={d} flow={flow}>
             {hasObservations(d)
               ? '두 조건을 관찰했어요, 발견 설명하기'
               : '두 조건 관찰하고 다음 단계'}
@@ -438,6 +476,7 @@ function LabFlow({ draft: d }: { draft: Draft }) {
       </section>
       <WritingPanel
         draft={d}
+        flow={flow}
         question={
           d.step === 3
             ? '바꾸기 전과 후, 무엇이 달라졌나요? 왜 그랬을까요?'
@@ -448,8 +487,10 @@ function LabFlow({ draft: d }: { draft: Draft }) {
     </div>
   );
 }
-function TheaterFlow({ draft: d }: { draft: Draft }) {
-  const { data, update, send } = useVillage();
+function TheaterFlow({ draft: d, flow }: { draft: Draft; flow: ActivityFlow }) {
+  const { data, update } = useVillage();
+  const send = flow.send;
+  const advance = flow.advance;
   const [playing, setPlaying] = useState(false);
   const [preparing, setPreparing] = useState(false);
   const [previewRead, setPreviewRead] = useState(false);
@@ -464,11 +505,11 @@ function TheaterFlow({ draft: d }: { draft: Draft }) {
   useEffect(() => {
     if (!preparing) return;
     const timer = window.setTimeout(() => {
-      send({ type: 'advance' });
+      advance();
       setPreparing(false);
     }, 500);
     return () => clearTimeout(timer);
-  }, [preparing, send]);
+  }, [preparing, advance]);
   useEffect(() => {
     const stop = () => {
       if (document.hidden) setPlaying(false);
@@ -479,7 +520,7 @@ function TheaterFlow({ draft: d }: { draft: Draft }) {
       window.speechSynthesis?.cancel();
     };
   }, []);
-  if (d.step === 4) return <Review draft={d} />;
+  if (d.step === 4) return <Review draft={d} flow={flow} />;
   if (d.step === 0)
     return (
       <div className="learning-grid">
@@ -595,7 +636,7 @@ function TheaterFlow({ draft: d }: { draft: Draft }) {
         <Button
           disabled={!previewRead}
           onClick={() => {
-            if (send({ type: 'approve' })) send({ type: 'advance' });
+            if (send({ type: 'approve' })) advance();
           }}
         >
           확인했어요, 아이와 보기
@@ -649,7 +690,9 @@ function TheaterFlow({ draft: d }: { draft: Draft }) {
             onChange={(text) => send({ type: 'text', text })}
             placeholder="친구에게 어떤 말을 하고 싶은지, 그 이유도 적어 보세요."
           />
-          <NextButton draft={d}>내 마음 모아 보기</NextButton>
+          <NextButton draft={d} flow={flow}>
+            내 마음 모아 보기
+          </NextButton>
           <Provenance />
         </section>
       </div>
@@ -749,7 +792,11 @@ function TheaterFlow({ draft: d }: { draft: Draft }) {
                 : '인물의 표정과 말을 살펴보세요. 같은 일을 겪어도 서로 다른 마음이 들 수 있어요.'}
             </p>
             <div className="quote">서로 다른 생각에도 귀를 기울여 봐요.</div>
-            {t.scene === 3 && <NextButton draft={d}>내 마음 표현하러 가기</NextButton>}
+            {t.scene === 3 && (
+              <NextButton draft={d} flow={flow}>
+                내 마음 표현하러 가기
+              </NextButton>
+            )}
           </>
         )}
         <Provenance />

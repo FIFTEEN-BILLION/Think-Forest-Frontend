@@ -1,94 +1,207 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { getWordbook, WORD_STATUS } from '../api/v1/endpoints';
+import type { WordbookEntry, WordbookSummary, WordStatus } from '../api/v1/types';
+import { useAuth } from '../providers/AuthProvider';
 import { Icon } from '../components/Icon';
-import { Button, PageHeading } from '../components/ui';
-import { WORDS } from '../data/experience';
+import {
+  libraryErrorText,
+  LibraryErrorNotice,
+  LibraryLoading,
+  LibrarySignedOutNotice,
+} from '../components/LibraryParts';
+import { WordEntryCard, WordQuizPanel } from '../components/WordParts';
+import { Button, Notice, PageHeading } from '../components/ui';
 
+interface WordbookResult {
+  key: string;
+  summary: WordbookSummary;
+  items: WordbookEntry[];
+  nextCursor: string | null;
+  error: string;
+}
+
+const EMPTY: WordbookSummary = {
+  total: 0,
+  familiar: 0,
+  practicing: 0,
+  new: 0,
+  newThisWeek: 0,
+  dueForReview: 0,
+};
+
+/** 단어 보관함(명세 13절). 요약·목록·상태 필터·퀴즈 모두 서버 값으로만 채운다. */
 export function WordsScreen() {
-  const [quiz, setQuiz] = useState(false),
-    [answer, setAnswer] = useState('');
+  const { client, status } = useAuth();
+  const [filter, setFilter] = useState<WordStatus | ''>('');
+  const [result, setResult] = useState<WordbookResult | null>(null);
+  const [reloads, setReloads] = useState(0);
+  const [quiz, setQuiz] = useState(false);
+  const key = `${reloads}|${filter}`;
+  const loading = status === 'signedIn' && result?.key !== key;
+  const summary = result?.key === key ? result.summary : EMPTY;
+  const items = result?.key === key ? result.items : [];
+  const nextCursor = result?.key === key ? result.nextCursor : null;
+  const error = result?.key === key ? result.error : '';
+
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    const abort = new AbortController();
+    getWordbook(client, { status: filter || undefined, limit: 30 }, abort.signal)
+      .then((body) => {
+        if (!abort.signal.aborted)
+          setResult({
+            key,
+            summary: body.summary,
+            items: body.items,
+            nextCursor: body.nextCursor,
+            error: '',
+          });
+      })
+      .catch((reason: unknown) => {
+        if (!abort.signal.aborted)
+          setResult({
+            key,
+            summary: EMPTY,
+            items: [],
+            nextCursor: null,
+            error: libraryErrorText(reason, '단어 보관함을 불러오지 못했어요.'),
+          });
+      });
+    return () => abort.abort();
+  }, [client, status, key, filter]);
+
+  const more = async () => {
+    if (!nextCursor) return;
+    try {
+      const body = await getWordbook(client, {
+        status: filter || undefined,
+        cursor: nextCursor,
+        limit: 30,
+      });
+      setResult((prev) =>
+        prev?.key === key
+          ? { ...prev, items: [...prev.items, ...body.items], nextCursor: body.nextCursor }
+          : prev,
+      );
+    } catch (reason) {
+      setResult((prev) =>
+        prev?.key === key
+          ? { ...prev, error: libraryErrorText(reason, '더 불러오지 못했어요.') }
+          : prev,
+      );
+    }
+  };
+
+  const update = (change: (items: WordbookEntry[]) => WordbookEntry[]) =>
+    setResult((prev) => (prev ? { ...prev, items: change(prev.items) } : prev));
+
+  const replace = (entry: WordbookEntry) =>
+    update((prev) => prev.map((item) => (item.id === entry.id ? entry : item)));
+
   return (
     <>
       <PageHeading
         eyebrow="MY WORD POCKET"
         title="새로 알게 된 말을 모아요"
-        description="이야기 속에서 만난 단어를 내 문장으로 만들어 보자!"
+        description="티키와 이야기하다 만난 낱말을 담고, 내 문장으로 만들어 보자!"
       >
-        <Button
-          onClick={() => {
-            setQuiz(!quiz);
-            setAnswer('');
-          }}
-        >
-          <Icon name="spark" /> 단어 퀴즈
+        <Button disabled={status !== 'signedIn'} onClick={() => setQuiz((value) => !value)}>
+          <Icon name="spark" /> {quiz ? '퀴즈 닫기' : '단어 퀴즈'}
         </Button>
       </PageHeading>
-      <section className="word-summary">
-        <div>
-          <span>🌱</span>
-          <strong>12</strong>
-          <small>만난 단어</small>
-        </div>
-        <div>
-          <span>⭐</span>
-          <strong>8</strong>
-          <small>내가 알아요</small>
-        </div>
-        <div>
-          <span>🎯</span>
-          <strong>4</strong>
-          <small>더 연습할 단어</small>
-        </div>
-        <p>
-          이번 주에는 <strong>과학 단어 5개</strong>를 만났어요!
-        </p>
-      </section>
-      {quiz && (
-        <section className="quiz-panel">
-          <span className="tag gold">보호자와 함께해도 좋아요</span>
-          <h2>“아직 확실하지 않지만 알고 있는 것으로 미루어 생각하는 것”은?</h2>
-          <div className="choice-row">
-            {['결로', '추측', '근거'].map((word) => (
+      {status === 'signedOut' && (
+        <LibrarySignedOutNotice what="내가 담은 낱말을" returnTo="/words" />
+      )}
+      {status === 'signedIn' && (
+        <>
+          <section className="word-summary">
+            <div>
+              <span>🌱</span>
+              <strong>{summary.total}</strong>
+              <small>담은 낱말</small>
+            </div>
+            <div>
+              <span>⭐</span>
+              <strong>{summary.familiar}</strong>
+              <small>이제 알아요</small>
+            </div>
+            <div>
+              <span>🎯</span>
+              <strong>{summary.practicing}</strong>
+              <small>연습 중이에요</small>
+            </div>
+            <p>
+              {summary.newThisWeek > 0
+                ? `이번 주에 새 낱말 ${summary.newThisWeek}개를 만났어요!`
+                : '이번 주에 만난 새 낱말은 아직 없어요.'}
+              {summary.dueForReview > 0 &&
+                ` 오늘 다시 만날 낱말이 ${summary.dueForReview}개 있어요.`}
+            </p>
+          </section>
+          {quiz && <WordQuizPanel onEntryChanged={replace} />}
+          <div className="filters" role="group" aria-label="낱말 상태 고르기">
+            <button
+              className={`chip ${filter === '' ? 'active' : ''}`}
+              aria-pressed={filter === ''}
+              onClick={() => setFilter('')}
+            >
+              전체 <small>{summary.total}</small>
+            </button>
+            {WORD_STATUS.map((item) => (
               <button
-                className={`chip ${answer === word ? 'active' : ''}`}
-                onClick={() => setAnswer(word)}
-                key={word}
+                key={item.key}
+                className={`chip ${filter === item.key ? 'active' : ''}`}
+                aria-pressed={filter === item.key}
+                onClick={() => setFilter(item.key)}
               >
-                {word}
+                {item.label}{' '}
+                <small>
+                  {item.key === 'NEW'
+                    ? summary.new
+                    : item.key === 'PRACTICING'
+                      ? summary.practicing
+                      : summary.familiar}
+                </small>
               </button>
             ))}
           </div>
-          {answer && (
-            <p className={answer === '추측' ? 'correct' : 'try-again'}>
-              {answer === '추측'
-                ? '맞았어! 그럼 ‘추측’을 넣은 네 문장도 만들어 볼까?'
-                : '거의 다 왔어. 예시를 다시 떠올려 보자!'}
-            </p>
-          )}
-        </section>
-      )}
-      <div className="word-grid">
-        {WORDS.map((item) => (
-          <article className="word-card" key={item.word}>
-            <span className="word-emoji">{item.emoji}</span>
-            <div className="row between">
-              <span className={`tag ${item.mastered ? 'teal' : 'gold'}`}>
-                {item.mastered ? '알아요' : '연습 중'}
-              </span>
-              <button aria-label="단어 듣기">
-                <Icon name="sound" />
-              </button>
+          <LibraryErrorNotice error={error} onRetry={() => setReloads((n) => n + 1)} />
+          {loading && items.length === 0 ? (
+            <LibraryLoading label="담아 둔 낱말을 꺼내는 중이에요…" />
+          ) : items.length === 0 ? (
+            <div className="panel empty">
+              <Icon name="book" />
+              <h2>아직 담은 낱말이 없어요.</h2>
+              <p>티키와 이야기하다 처음 보는 말이 나오면 그 자리에서 담을 수 있어요.</p>
             </div>
-            <h2>
-              {item.word} <small>{item.reading}</small>
-            </h2>
-            <p>{item.meaning}</p>
-            <blockquote>“{item.example}”</blockquote>
-            <button className="btn light">
-              내 문장 만들기 <Icon name="arrow" />
-            </button>
-          </article>
-        ))}
-      </div>
+          ) : (
+            <div className="word-grid">
+              {items.map((entry) => (
+                <WordEntryCard
+                  key={entry.id}
+                  entry={entry}
+                  onChanged={replace}
+                  onRemoved={(id) => {
+                    update((prev) => prev.filter((item) => item.id !== id));
+                    setReloads((n) => n + 1);
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          {nextCursor && (
+            <div className="actions">
+              <Button className="light" onClick={() => void more()}>
+                더 보기
+              </Button>
+            </div>
+          )}
+          <Notice>
+            퀴즈 결과는 점수나 등수로 쓰지 않아요. 낱말이 얼마나 친해졌는지와 다시 만날 날만
+            바뀌어요.
+          </Notice>
+        </>
+      )}
     </>
   );
 }

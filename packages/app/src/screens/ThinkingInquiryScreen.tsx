@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useInterpretThought, useTeachFriend, useThinkingChallenge } from '../hooks/useThinkingApi';
-import type { ShadowMission } from '../api/index';
-import { useShadowMission } from '../hooks/index';
+import { interpretThought, requestChallenge, teachFriend, useApiClient } from '../api';
+import type { ShadowMission } from '../api';
+import { useShadowMission } from '../hooks';
 import { Icon } from '../components/Icon';
 import { ThinkingComparison } from '../components/ThinkingComparison';
 import {
@@ -26,6 +26,7 @@ import {
   changedVars,
   describeChanges,
   effectOf,
+  isSetup,
   lengthOf,
 } from '../lib/shadow';
 import {
@@ -156,38 +157,40 @@ function StepPredict({ draft: d, mission: m }: { draft: Draft; mission: ShadowMi
 
 function StepFriend({ draft: d, mission: m }: { draft: Draft; mission: ShadowMission }) {
   const { send } = useVillage();
+  const request = useApiClient();
   const q = d.thinking!;
   const [attempt, setAttempt] = useState(0);
-  const interpretation = useInterpretThought(m.friendBeliefs);
-  const { mutate, reset } = interpretation;
-  const failed = interpretation.isError;
+  const [failed, setFailed] = useState(false);
   const { prediction, reason, reasonSkipped, origin, friendLine } = q;
   useEffect(() => {
     if (friendLine) return;
     const controller = new AbortController();
-    mutate(
+    void interpretThought(
+      request,
       {
-        body: {
-          prediction: prediction ?? 'unknown',
-          reason: reasonSkipped ? '' : reason,
-          reasonSkipped,
-          inputOrigin: origin,
-        },
-        signal: controller.signal,
+        prediction: prediction ?? 'unknown',
+        reason: reasonSkipped ? '' : reason,
+        reasonSkipped,
+        inputOrigin: origin,
       },
-      {
-        onSuccess: ({ response: r, belief }) => {
-          if (controller.signal.aborted) return;
-          send({
-            type: 'think-interpret',
-            claims: r.claims,
-            restatement: r.restatement,
-            friendBeliefId: r.friendBeliefId,
-            friendLine: r.friendLine,
-            friendVariable: belief.variable,
-            source: r.source,
-          });
-        },
+      controller.signal,
+    ).then(
+      (r) => {
+        if (controller.signal.aborted) return;
+        const belief = m.friendBeliefs.find((b) => b.id === r.friendBeliefId);
+        if (!belief) return setFailed(true);
+        send({
+          type: 'think-interpret',
+          claims: r.claims,
+          restatement: r.restatement,
+          friendBeliefId: r.friendBeliefId,
+          friendLine: r.friendLine,
+          friendVariable: belief.variable,
+          source: r.source,
+        });
+      },
+      () => {
+        if (!controller.signal.aborted) setFailed(true);
       },
     );
     return () => controller.abort();
@@ -199,7 +202,7 @@ function StepFriend({ draft: d, mission: m }: { draft: Draft; mission: ShadowMis
     prediction,
     reason,
     reasonSkipped,
-    mutate,
+    request,
     send,
   ]);
 
@@ -216,7 +219,7 @@ function StepFriend({ draft: d, mission: m }: { draft: Draft; mission: ShadowMis
         {failed && (
           <Button
             onClick={() => {
-              reset();
+              setFailed(false);
               setAttempt((n) => n + 1);
             }}
           >
@@ -512,18 +515,13 @@ function ChallengeCard({ ch }: { ch: ThinkingChallenge }) {
 
 function StepTeach({ draft: d }: { draft: Draft }) {
   const { send } = useVillage();
+  const request = useApiClient();
   const q: ThinkingInquiry = d.thinking!;
   const [cards, setCards] = useState<string[]>([]);
   const [message, setMessage] = useState('');
   const [origin, setOrigin] = useState<InputOrigin>('adult');
-  const teaching = useTeachFriend();
-  const challenge = useThinkingChallenge();
-  const busy = teaching.isPending ? 'teach' : challenge.isPending ? 'challenge' : null;
-  const netError = teaching.error
-    ? '생각 친구에게 말을 전하지 못했어요. 쓴 내용은 그대로 있어요. 다시 해 볼까요?'
-    : challenge.error
-      ? '새 예측을 받아 오지 못했어요. 쓴 생각은 그대로 있어요. 다시 해 볼까요?'
-      : '';
+  const [busy, setBusy] = useState<'teach' | 'challenge' | null>(null);
+  const [netError, setNetError] = useState('');
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
 
@@ -535,66 +533,88 @@ function StepTeach({ draft: d }: { draft: Draft }) {
     controller.current?.abort();
     const c = new AbortController();
     controller.current = c;
-    teaching.reset();
-    challenge.reset();
+    setNetError('');
     return c;
   };
   const teach = (c = begin()) => {
     const sentMessage = message.trim(),
       sentCards = selected;
-    teaching.mutate(
+    setBusy('teach');
+    void teachFriend(
+      request,
       {
-        body: {
-          beliefId: q.friendBeliefId,
-          message: sentMessage,
-          cards: sentCards.map((e) => ({ base: e.base, compare: e.compare })),
-          attempt: q.exchanges.length + 1,
-          inputOrigin: origin,
-        },
-        signal: c.signal,
+        beliefId: q.friendBeliefId,
+        message: sentMessage,
+        cards: sentCards.map((e) => ({ base: e.base, compare: e.compare })),
+        attempt: q.exchanges.length + 1,
+        inputOrigin: origin,
       },
-      {
-        onSuccess: (r) => {
-          if (c.signal.aborted) return;
-          const ok = send({
-            type: 'think-teach',
-            exchange: {
-              message: sentMessage,
-              cardIds: sentCards.map((e) => e.id),
-              convinced: r.convinced,
-              helpLevel: r.helpLevel,
-              reply: r.friendReply,
-              source: r.source,
-            },
-          });
-          if (ok) setMessage('');
-        },
+      c.signal,
+    ).then(
+      (r) => {
+        if (c.signal.aborted) return;
+        setBusy(null);
+        const ok = send({
+          type: 'think-teach',
+          exchange: {
+            message: sentMessage,
+            cardIds: sentCards.map((e) => e.id),
+            convinced: r.convinced,
+            helpLevel: r.helpLevel,
+            reply: r.friendReply,
+            source: r.source,
+          },
+        });
+        if (ok) setMessage('');
+      },
+      () => {
+        if (c.signal.aborted) return;
+        setBusy(null);
+        setNetError('생각 친구에게 말을 전하지 못했어요. 쓴 내용은 그대로 있어요. 다시 해 볼까요?');
       },
     );
   };
   const askChallenge = (c = begin()) => {
-    challenge.mutate(
+    setBusy('challenge');
+    void requestChallenge(
+      request,
       {
-        body: {
-          beliefId: q.friendBeliefId,
-          convinced: q.convinced,
-          experiments: observed.map((e) => ({ base: e.base, compare: e.compare })),
-          finalText: q.final,
-          finalReason: q.finalReason,
-          inputOrigin: q.origin,
-        },
-        signal: c.signal,
+        beliefId: q.friendBeliefId,
+        convinced: q.convinced,
+        experiments: observed.map((e) => ({ base: e.base, compare: e.compare })),
+        finalText: q.final,
+        finalReason: q.finalReason,
+        inputOrigin: q.origin,
       },
-      {
-        onSuccess: (r) => {
-          if (c.signal.aborted) return;
-          const ch = r.challenge;
-          send({
-            type: 'think-challenge',
-            challenge: { ...ch, source: r.source },
-            finalClaims: r.finalClaims,
-          });
-        },
+      c.signal,
+    ).then(
+      (r) => {
+        if (c.signal.aborted) return;
+        setBusy(null);
+        const ch = r.challenge;
+        if (!isSetup(ch.base) || !isSetup(ch.compare))
+          return setNetError('새 예측을 읽지 못했어요. 다시 받아 볼까요?');
+        send({
+          type: 'think-challenge',
+          challenge: {
+            id: ch.id,
+            line: ch.line,
+            base: ch.base,
+            compare: ch.compare,
+            baseLength: ch.baseLength,
+            compareLength: ch.compareLength,
+            friendPrediction: ch.friendPrediction,
+            confounded: ch.confounded,
+            friendCorrect: ch.friendCorrect,
+            source: r.source,
+          },
+          finalClaims: r.finalClaims,
+        });
+      },
+      () => {
+        if (c.signal.aborted) return;
+        setBusy(null);
+        setNetError('새 예측을 받아 오지 못했어요. 쓴 생각은 그대로 있어요. 다시 해 볼까요?');
       },
     );
   };

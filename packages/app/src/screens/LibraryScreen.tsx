@@ -1,12 +1,31 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { PLACES, TRACKS } from '../data/catalog';
+import {
+  categoryEmoji,
+  categoryLabel,
+  isServerStoryId,
+  listStories,
+  mergeShelf,
+  STORY_CATEGORIES,
+} from '../api/v1/endpoints';
+import type { ShelfItem } from '../api/v1/endpoints';
+import type { StorySummary } from '../api/v1/types';
+import { useAuth } from '../providers/AuthProvider';
+import { PLACES } from '../data/catalog';
 import { useVillage } from '../providers/VillageProvider';
 import { Icon } from '../components/Icon';
 import { StageArt } from '../components/Simulation';
 import { InquiryComparison } from '../components/InquiryComparison';
 import { ThinkingComparison } from '../components/ThinkingComparison';
 import { PathRecordCard } from '../components/PathParts';
+import { LibraryBookshelf } from '../components/LibraryBooks';
+import {
+  libraryErrorText,
+  LibraryErrorNotice,
+  LibraryOriginTag,
+  LibrarySignedOutNotice,
+} from '../components/LibraryParts';
+import { LibraryServerStory } from '../components/LibraryServerStory';
 import {
   Button,
   EmptyState,
@@ -16,28 +35,114 @@ import {
   ReadAloud,
   RubricBars,
 } from '../components/ui';
+
+interface ShelfResult {
+  key: string;
+  stories: StorySummary[];
+  nextCursor: string | null;
+  error: string;
+}
+
+/** 서버 이야기(`/stories`)와 이 기기 기록을 한 책장에 모아 보여 준다. 어디에 저장됐는지는 카드마다 적는다. */
 export function LibraryScreen() {
   const { data } = useVillage();
+  const { client, status } = useAuth();
   const [params, setParams] = useSearchParams();
-  const track = params.get('track') ?? 'all',
-    source = params.get('source') ?? 'all',
-    query = params.get('q') ?? '',
-    favorites = params.get('favorites') === 'yes';
-  const setFilter = (key: string, value: string) =>
+  const view = params.get('view') === 'books' ? 'books' : 'shelf';
+  const category = params.get('category') ?? '';
+  const query = params.get('q') ?? '';
+  const favorites = params.get('favorites') === 'yes';
+  const from = params.get('from') ?? '';
+  const to = params.get('to') ?? '';
+
+  // 불러온 결과에 조건 key 를 붙여 둔다. key 가 지금 조건과 다르면 곧 바뀔 화면이라 "불러오는 중"이다.
+  const [result, setResult] = useState<ShelfResult | null>(null);
+  const [reloads, setReloads] = useState(0);
+  const [appending, setAppending] = useState(false);
+  const filters = { query, category, favorite: favorites, from, to };
+  const key = `${reloads}|${query}|${category}|${favorites}|${from}|${to}`;
+  const loading = status === 'signedIn' && result?.key !== key;
+  const stories = result?.key === key ? result.stories : [];
+  const nextCursor = result?.key === key ? result.nextCursor : null;
+  const error = result?.key === key ? result.error : '';
+
+  const setFilter = (name: string, value: string) =>
     setParams(
       (p) => {
-        p.set(key, value);
-        return p;
+        const next = new URLSearchParams(p);
+        if (value) next.set(name, value);
+        else next.delete(name);
+        return next;
       },
       { replace: true },
     );
-  const records = data.sessions.filter(
-    (r) =>
-      (track === 'all' || r.track === track) &&
-      (source === 'all' || r.source === source) &&
-      (!favorites || r.favorite) &&
-      `${r.title} ${r.text}`.includes(query),
-  );
+
+  useEffect(() => {
+    if (status !== 'signedIn') return;
+    const abort = new AbortController();
+    // 검색어를 한 글자씩 칠 때마다 서버를 부르지 않도록 잠깐 기다린다.
+    const timer = window.setTimeout(
+      () => {
+        listStories(
+          client,
+          { query, category, favorite: favorites, from, to, limit: 20 },
+          abort.signal,
+        )
+          .then((page) => {
+            if (!abort.signal.aborted)
+              setResult({ key, stories: page.items, nextCursor: page.nextCursor, error: '' });
+          })
+          .catch((reason: unknown) => {
+            if (!abort.signal.aborted)
+              setResult({
+                key,
+                stories: [],
+                nextCursor: null,
+                error: libraryErrorText(reason, '서버 기록을 불러오지 못했어요.'),
+              });
+          });
+      },
+      query ? 300 : 0,
+    );
+    return () => {
+      clearTimeout(timer);
+      abort.abort();
+    };
+  }, [client, status, key, query, category, favorites, from, to]);
+
+  const more = async () => {
+    if (!nextCursor) return;
+    setAppending(true);
+    try {
+      const page = await listStories(client, {
+        query,
+        category,
+        favorite: favorites,
+        from,
+        to,
+        cursor: nextCursor,
+        limit: 20,
+      });
+      setResult((prev) =>
+        prev?.key === key
+          ? { ...prev, stories: [...prev.stories, ...page.items], nextCursor: page.nextCursor }
+          : prev,
+      );
+    } catch (reason) {
+      setResult((prev) =>
+        prev?.key === key
+          ? { ...prev, error: libraryErrorText(reason, '더 불러오지 못했어요.') }
+          : prev,
+      );
+    } finally {
+      setAppending(false);
+    }
+  };
+
+  const items = mergeShelf(stories, data.sessions, filters);
+  const serverCount = items.filter((item) => item.origin === 'server').length;
+  const localCount = items.filter((item) => item.origin !== 'server').length;
+
   return (
     <>
       <PageHeading
@@ -45,108 +150,173 @@ export function LibraryScreen() {
         title="내 생각으로 채워지는 책장"
         description="작은 발견도, 달라진 생각도. 모두 소중한 나의 기록이에요."
       >
-        <span className="tag teal">
-          직접 완료 {data.sessions.filter((r) => r.source === 'local').length}개
-        </span>
+        <span className="tag teal">서버에 저장 {serverCount}개</span>
+        <span className="tag sky">이 기기에 {localCount}개</span>
       </PageHeading>
-      <div className="library-toolbar">
-        <div className="filters" role="group" aria-label="학습 공간 필터">
-          {[['all', '전체'], ...TRACKS.map((t) => [t, PLACES[t].name])].map(([key, label]) => (
-            <button
-              key={key}
-              className={`chip ${track === key ? 'active' : ''}`}
-              aria-pressed={track === key}
-              onClick={() => setFilter('track', key!)}
-            >
-              {label}{' '}
-              <small>{data.sessions.filter((r) => key === 'all' || r.track === key).length}</small>
-            </button>
-          ))}
-        </div>
-        <div className="row wrap">
-          <label className="search-field">
-            <Icon name="search" />
-            <input
-              aria-label="책장 검색"
-              value={query}
-              placeholder="제목이나 내 문장 찾기"
-              onChange={(e) => setFilter('q', e.target.value)}
-            />
-          </label>
-          <select
-            className="compact-select"
-            aria-label="기록 종류"
-            value={source}
-            onChange={(e) => setFilter('source', e.target.value)}
-          >
-            <option value="all">모든 기록</option>
-            <option value="local">내가 남긴 기록</option>
-            <option value="mock">예시 기록</option>
-          </select>
-          <button
-            className={`chip ${favorites ? 'active' : ''}`}
-            aria-pressed={favorites}
-            onClick={() => setFilter('favorites', favorites ? 'no' : 'yes')}
-          >
-            <Icon name="heart" />
-            아끼는 기록
-          </button>
-        </div>
+      <div className="filters" role="tablist" aria-label="책장 보기">
+        <button
+          className={`chip ${view === 'shelf' ? 'active' : ''}`}
+          aria-pressed={view === 'shelf'}
+          onClick={() => setFilter('view', '')}
+        >
+          <Icon name="book" /> 이야기 한 편씩
+        </button>
+        <button
+          className={`chip ${view === 'books' ? 'active' : ''}`}
+          aria-pressed={view === 'books'}
+          onClick={() => setFilter('view', 'books')}
+        >
+          <Icon name="spark" /> 이야기책으로 묶기
+        </button>
       </div>
-      <div className="section-title">
-        <small>{records.length}개의 기록</small>
-        <small>최근에 남긴 순서</small>
-      </div>
-      {records.length ? (
-        <div className="cards books">
-          {records.map((r) => (
-            <article className="book" key={r.id}>
-              <div className={`book-cover ${PLACES[r.track].color}`}>
-                <span className="eyebrow">MY LITTLE DISCOVERY</span>
-                <h3>{r.title}</h3>
-                <Icon name={PLACES[r.track].icon} />
-              </div>
-              <div className="book-body">
-                <div className="row between">
-                  <span className={`tag ${PLACES[r.track].color}`}>{PLACES[r.track].name}</span>
-                  <span className={`tag ${r.source === 'mock' ? 'gold' : 'teal'}`}>
-                    {r.source === 'mock' ? '예시 기록' : '내가 쓴 문장'}
-                  </span>
-                </div>
-                <p className="line-clamp">{r.text}</p>
-                <small className="muted">
-                  {r.date} · {r.durationMinutes}분의 모험 {r.favorite && '· ♥'}
-                </small>
-                <Link to={`/shelf/${r.id}`} className="btn light">
-                  내 생각 펼쳐 보기
-                  <Icon name="arrow" />
-                </Link>
-              </div>
-            </article>
-          ))}
-        </div>
-      ) : (
-        <EmptyState
-          title={
-            query || favorites || track !== 'all'
-              ? '조건에 맞는 기록이 없어요.'
-              : '아직 쓰이지 않은, 무궁무진한 이야기.'
-          }
-          description="검색 조건을 바꾸거나 새로운 모험에서 첫 문장을 남겨 보세요."
-        />
+      {status === 'signedOut' && (
+        <LibrarySignedOutNotice what="티키와 만든 이야기를" returnTo="/shelf" />
       )}
-      <Notice>
-        ‘예시 기록’은 서비스를 둘러보기 위한 목데이터예요. 직접 작성한 기록과 구분되며, 아이의 자동
-        예시 기록은 서비스를 둘러보기 위한 목데이터예요. 직접 만든 이야기와 구분해 보여요.
-      </Notice>
+      {view === 'books' ? (
+        <LibraryBookshelf stories={stories} />
+      ) : (
+        <>
+          <div className="library-toolbar">
+            <div className="filters" role="group" aria-label="이야기 종류 필터">
+              <button
+                className={`chip ${category === '' ? 'active' : ''}`}
+                aria-pressed={category === ''}
+                onClick={() => setFilter('category', '')}
+              >
+                전체
+              </button>
+              {STORY_CATEGORIES.map((item) => (
+                <button
+                  key={item.key}
+                  className={`chip ${category === item.key ? 'active' : ''}`}
+                  aria-pressed={category === item.key}
+                  onClick={() => setFilter('category', item.key)}
+                >
+                  {item.emoji} {item.label}
+                </button>
+              ))}
+            </div>
+            <div className="row wrap">
+              <label className="search-field">
+                <Icon name="search" />
+                <input
+                  aria-label="책장 검색"
+                  value={query}
+                  placeholder="제목이나 내 문장 찾기"
+                  onChange={(e) => setFilter('q', e.target.value)}
+                />
+              </label>
+              <label className="row">
+                <span className="muted">언제부터</span>
+                <input
+                  type="date"
+                  aria-label="이 날짜부터"
+                  value={from}
+                  onChange={(e) => setFilter('from', e.target.value)}
+                />
+              </label>
+              <label className="row">
+                <span className="muted">언제까지</span>
+                <input
+                  type="date"
+                  aria-label="이 날짜까지"
+                  value={to}
+                  onChange={(e) => setFilter('to', e.target.value)}
+                />
+              </label>
+              <button
+                className={`chip ${favorites ? 'active' : ''}`}
+                aria-pressed={favorites}
+                onClick={() => setFilter('favorites', favorites ? '' : 'yes')}
+              >
+                <Icon name="heart" />
+                아끼는 기록
+              </button>
+            </div>
+          </div>
+          {category && (
+            <Notice>
+              종류를 고르면 티키와 만든 이야기만 보여요. 이 기기에만 있는 기록에는 종류가 없어요.
+            </Notice>
+          )}
+          <LibraryErrorNotice error={error} onRetry={() => setReloads((n) => n + 1)} />
+          <div className="section-title">
+            <small>{loading ? '불러오는 중…' : `${items.length}개의 기록`}</small>
+            <small>최근에 남긴 순서</small>
+          </div>
+          {items.length ? (
+            <div className="cards books">
+              {items.map((item) => (
+                <LibraryShelfCard item={item} key={`${item.origin}-${item.id}`} />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title={
+                query || favorites || category || from || to
+                  ? '조건에 맞는 기록이 없어요.'
+                  : '아직 쓰이지 않은, 무궁무진한 이야기.'
+              }
+              description="검색 조건을 바꾸거나 티키와 새 이야기를 시작해 보세요."
+              to="/talk"
+              action="티키와 이야기하기"
+            />
+          )}
+          {nextCursor && (
+            <div className="actions">
+              <Button className="light" disabled={appending} onClick={() => void more()}>
+                {appending ? '불러오는 중…' : '더 보기'}
+              </Button>
+            </div>
+          )}
+          <Notice>
+            ‘둘러보기용 예시’는 서비스를 살펴보기 위한 목데이터예요. 티키와 만든 이야기는 서버에
+            저장되고, ‘이 기기에만 있어요’ 기록은 이 브라우저에만 남아요.
+          </Notice>
+        </>
+      )}
     </>
   );
 }
+
+function LibraryShelfCard({ item }: { item: ShelfItem }) {
+  const color = item.origin === 'server' ? 'mint' : item.origin === 'local' ? 'sky' : 'gold';
+  return (
+    <article className="book">
+      <div className={`book-cover ${color}`}>
+        <span className="eyebrow">MY LITTLE DISCOVERY</span>
+        <h3>{item.title}</h3>
+        <span aria-hidden="true">{item.category ? categoryEmoji(item.category) : '📖'}</span>
+      </div>
+      <div className="book-body">
+        <div className="row between">
+          {item.category ? (
+            <span className="tag lavender">{categoryLabel(item.category)}</span>
+          ) : (
+            <span className="tag lavender">생각 모험</span>
+          )}
+          <LibraryOriginTag origin={item.origin} />
+        </div>
+        <p className="line-clamp">{item.summary}</p>
+        <small className="muted">
+          {item.date}
+          {item.favorite && ' · ♥ 아끼는 기록'}
+        </small>
+        <Link to={item.href} className="btn light">
+          내 생각 펼쳐 보기
+          <Icon name="arrow" />
+        </Link>
+      </div>
+    </article>
+  );
+}
+
 export function RecordDetailScreen() {
   const { id } = useParams();
   const { data, update, toast } = useVillage();
   const [scene, setScene] = useState(0);
   const [copied, setCopied] = useState(false);
+  if (isServerStoryId(id)) return <LibraryServerStory storyId={id!} />;
   const record = data.sessions.find((r) => r.id === id);
   if (!record)
     return (
@@ -193,11 +363,11 @@ export function RecordDetailScreen() {
           {record.favorite ? '아끼는 기록에 담았어요' : '아끼는 기록에 담기'}
         </Button>
       </PageHeading>
-      {record.source === 'mock' && (
-        <Notice>
-          서비스 흐름을 살펴보기 위한 예시 목데이터예요. 실제 아이의 학습 결과가 아니에요.
-        </Notice>
-      )}
+      <Notice>
+        {record.source === 'mock'
+          ? '서비스 흐름을 살펴보기 위한 예시 목데이터예요. 실제 아이의 학습 결과가 아니에요.'
+          : '이 기록은 이 기기에만 있어요. 티키 서버에는 저장되지 않았어요.'}
+      </Notice>
       {record.path ? (
         <>
           <PathRecordCard path={record.path} />
@@ -311,9 +481,11 @@ export function RecordDetailScreen() {
     </>
   );
 }
+
 export function CompleteScreen() {
   const { id } = useParams();
   const { data, storageError } = useVillage();
+  if (isServerStoryId(id)) return <LibraryServerStory storyId={id!} variant="complete" />;
   const record = data.sessions.find((s) => s.id === id);
   if (!record)
     return (

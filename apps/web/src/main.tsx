@@ -19,7 +19,7 @@ const devLogin =
 
 createRoot(root).render(
   <StrictMode>
-    <AppProviders apiBaseUrl={apiBaseUrl} devLogin={devLogin}>
+    <AppProviders apiBaseUrl={apiBaseUrl} v1BaseUrl="/api/v1" devLogin={devLogin}>
       <RouterProvider router={router} />
     </AppProviders>
   </StrictMode>,

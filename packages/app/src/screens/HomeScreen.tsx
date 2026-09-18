@@ -1,237 +1,328 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { V1Error } from '../api/v1/client';
+import { getHome, listTopicCategories, listTopicPage } from '../api/v1/endpoints';
+import type {
+  HomeCommunityStoryPreview,
+  HomeRecentWord,
+  HomeResponse,
+  TopicCategory,
+  TopicListItem,
+} from '../api/v1/types';
+import { useAuth } from '../providers/AuthProvider';
 import { Icon } from '../components/Icon';
-import { COMMUNITY_STORIES, WORDS } from '../data/experience';
-import { HOME_CATEGORIES, HOME_TOPICS } from '../data/home';
-import type { HomeCategory } from '../data/home';
+import {
+  HomeCommunityPeek,
+  HomeHeroTopic,
+  HomeResumeCard,
+  HomeTopicGrid,
+  HomeWeeklyBadge,
+  HomeWordPeek,
+} from '../components/HomeSections';
+import { TopicCategoryBar } from '../components/TopicCategoryBar';
+import { Button, EmptyState, Notice } from '../components/ui';
 import { useVillage } from '../providers/VillageProvider';
 
+const TOPIC_LIMIT = 6;
+const errorText = (error: unknown, fallback: string) =>
+  error instanceof Error && error.message ? error.message : fallback;
+
 export function HomeScreen() {
+  const { status } = useAuth();
+  if (status === 'loading')
+    return (
+      <div className="route-loading" role="status">
+        오늘의 이야기를 불러오는 중이에요…
+      </div>
+    );
+  return status === 'signedIn' ? <SignedInHome /> : <SignedOutHome />;
+}
+
+/**
+ * 로그인 전에도 이 기기의 생각 모험은 그대로 쓸 수 있다. 홈에서 로그인을 강요하지 않는다.
+ * 서버 추천·이어하기처럼 내 기록이 필요한 것만 로그인 뒤에 보인다.
+ */
+function SignedOutHome() {
   const { data } = useVillage();
-  const [category, setCategory] = useState<HomeCategory>('추천');
-  const firstVisit = !data.consent.done;
-  const draft = data.resume;
-  const recent = [...data.sessions.filter((record) => record.source === 'local')]
-    .sort((a, b) => Date.parse(b.completedAt) - Date.parse(a.completedAt))
-    .slice(0, 2);
-  const stories = recent.length
-    ? recent
-    : data.sessions.filter((r) => r.source === 'mock').slice(0, 2);
-  const topics =
-    category === '추천'
-      ? HOME_TOPICS.slice(0, 3)
-      : HOME_TOPICS.filter((topic) => topic.category === category);
-  const startLink = (to: string) =>
-    firstVisit ? `/first-talk?next=${encodeURIComponent(to)}` : to;
-  const hero = firstVisit
-    ? {
-        label: '우리의 첫 번째 이야기',
-        title: '안녕! 나는 네 생각친구 티키야.',
-        description: '네가 좋아하는 것부터 들려줄래? 작은 생각도, 엉뚱한 상상도 좋아.',
-        action: '티키와 만나기',
-        hint: '말로 해도, 글로 써도 괜찮아',
-        to: '/first-talk',
-        icon: 'chat',
-      }
-    : draft
-      ? {
-          label: '아직 이어지는 우리의 이야기',
-          title: draft.title,
-          description: '지난번에 남긴 생각을 기억하고 있어. 멈췄던 곳부터 함께 이어가 볼까?',
-          action: '이어서 이야기하기',
-          hint: '작성하던 내용이 그대로 있어',
-          to: `/session/${draft.track}`,
-          icon: 'play',
-        }
-      : {
-          label: '오늘 함께 생각해 볼 질문',
-          title: '컵 밖의 물은 어디서 왔을까?',
-          description: '차가운 컵 밖에 송골송골 물방울이 맺혔어. 네 생각을 들려줘!',
-          action: '새 이야기 시작하기',
-          hint: '정답보다 네 생각이 궁금해',
-          to: '/talk',
-          icon: 'chat',
-        };
-
   return (
-    <div className="home-page">
-      <header className="home-welcome">
-        <div>
-          <span className="home-eyebrow">오늘의 작은 궁금증</span>
-          <h1>
-            {firstVisit
-              ? '생각이 자라는 곳에 잘 왔어!'
-              : `${data.profile.name}, 오늘은 어떤 생각을 했어?`}
-          </h1>
+    <>
+      <section className="welcome-strip">
+        <div className="welcome-avatar">🧒🏻</div>
+        <div className="welcome-copy">
+          <span className="eyebrow">WELCOME</span>
+          <h1>오늘도 네 생각이 궁금해!</h1>
+          <p>로그인하면 티키가 나에게 맞는 주제를 골라 주고, 하던 이야기도 이어갈 수 있어요.</p>
         </div>
-        <Link className="home-friends-shortcut" to="/community">
-          <Icon name="heart" /> 친구들 이야기 <Icon name="arrow" />
+        <Link className="first-hello" to="/login">
+          👋 로그인하고 티키 만나기
         </Link>
-      </header>
-
-      <section className="home-hero" aria-labelledby="home-hero-title">
-        <div className="home-hero-copy">
-          <span className="home-hero-label">
-            <span /> {hero.label}
-          </span>
-          <h2 id="home-hero-title">{hero.title}</h2>
-          <p>{hero.description}</p>
-          <Link className="home-primary" to={hero.to}>
-            <Icon name={hero.icon} /> {hero.action} <Icon name="arrow" />
-          </Link>
-          <small>{hero.hint}</small>
-        </div>
-        <div className="home-hero-picture" aria-hidden="true">
-          <span className="home-picture-spark spark-one">✦</span>
-          <span className="home-picture-spark spark-two">✧</span>
-          <div className="home-picture-note">“왜 그렇게 생각했어?”</div>
-          <div className="home-picture-circle">
-            <span>{firstVisit ? '🌱' : draft ? '📖' : '🧊'}</span>
-          </div>
-          <span className="home-picture-leaf">🌿</span>
-          <span className="home-picture-caption">너의 생각을 듣는 친구, 티키</span>
-        </div>
       </section>
 
-      <section className="home-section" aria-labelledby="home-topics-title">
-        <div className="home-section-heading">
-          <div>
-            <span className="home-eyebrow">마음 가는 질문을 골라봐</span>
-            <h2 id="home-topics-title">오늘은 무엇이 궁금해?</h2>
-          </div>
-          <Link to={startLink('/topics/new')} className="home-text-link">
-            <Icon name="plus" /> 내가 주제 정하기
-          </Link>
-        </div>
-        <div className="home-topic-filters" role="group" aria-label="질문 주제">
-          {HOME_CATEGORIES.map((item) => (
-            <button
-              key={item}
-              className={category === item ? 'selected' : ''}
-              aria-pressed={category === item}
-              onClick={() => setCategory(item)}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-        <div className="home-question-grid">
-          {topics.map((topic) => (
-            <Link
-              className={`home-question-card ${topic.color}`}
-              to={startLink(topic.to)}
-              key={topic.id}
-            >
-              <div className="home-question-top">
-                <span aria-hidden="true">{topic.emoji}</span>
-                <span className="home-question-category">{topic.category}</span>
-              </div>
-              <h3>{topic.title}</h3>
-              <p>{topic.description}</p>
-              <span className="home-question-action">
-                {topic.invitation}
-                <Icon name="arrow" />
-              </span>
-            </Link>
-          ))}
-        </div>
-        <div className="home-section-tail">
-          <Link to="/adventures" className="home-text-link">
-            다른 모험도 둘러보기 <Icon name="arrow" />
-          </Link>
-        </div>
-      </section>
+      <Notice>
+        지금은 로그인하지 않아도 이 기기에서 생각 모험을 할 수 있어요. 기록은 이 기기에만 저장돼요.
+      </Notice>
 
-      <div className="home-personal-grid">
-        <section className="home-personal-panel" aria-labelledby="home-records-title">
-          <div className="home-section-heading">
-            <h2 id="home-records-title">
-              {recent.length ? '내가 남긴 이야기' : '이렇게 이야기가 쌓여요'}
-            </h2>
-            <Link to="/shelf" className="home-text-link">
-              책장 보기 <Icon name="arrow" />
-            </Link>
-          </div>
-          {stories.length ? (
-            stories.map((story) => (
-              <Link className="home-recent-story" to={`/shelf/${story.id}`} key={story.id}>
-                <span className={`home-book-icon ${story.track}`} aria-hidden="true">
-                  {story.track === 'lab' ? '🔎' : story.track === 'theater' ? '🌷' : '📖'}
-                </span>
-                <div>
-                  <span className="home-record-label">
-                    {story.source === 'mock' ? '예시 이야기' : '내가 남긴 생각'}
-                  </span>
-                  <h3>{story.title}</h3>
-                  <p>{story.answers[0]?.text ?? story.text}</p>
-                </div>
-                <Icon name="arrow" />
-              </Link>
-            ))
-          ) : (
-            <div className="home-empty-shelf">
-              <span aria-hidden="true">📖</span>
-              <h3>첫 이야기가 들어올 자리야.</h3>
-              <p>티키와 나눈 생각을 여기에 차곡차곡 모아둘게.</p>
-              <Link className="home-text-link" to={hero.to}>
-                첫 이야기 시작하기 <Icon name="arrow" />
-              </Link>
-            </div>
-          )}
-        </section>
-        <section className="home-personal-panel home-word-panel" aria-labelledby="home-words-title">
-          <div className="home-section-heading">
+      <div className="section-title">
+        <div>
+          <span className="eyebrow">PICK AN ADVENTURE</span>
+          <h2>오늘 어떤 모험을 떠나 볼까?</h2>
+        </div>
+        <Link to="/adventures">모든 모험 보기 →</Link>
+      </div>
+      <div className="topic-grid">
+        {[
+          { to: '/adventures/forest', emoji: '🌳', area: '사고력', title: '이야기 숲' },
+          { to: '/adventures/lab', emoji: '🧪', area: '과학 · 수학', title: '호기심 실험실' },
+          { to: '/adventures/theater', emoji: '🎭', area: '인성', title: '마음 극장' },
+        ].map((place, index) => (
+          <Link
+            className={`topic-card ${['mint', 'sky', 'lavender'][index]}`}
+            to={place.to}
+            key={place.to}
+          >
+            <span className="topic-emoji">{place.emoji}</span>
             <div>
-              <h2 id="home-words-title">생각을 넓히는 단어</h2>
-              <span className="home-record-label">이야기에서 만날 단어 미리보기</span>
+              <span className="eyebrow">{place.area}</span>
+              <h3>{place.title}</h3>
+              <small>이 기기에서 바로 할 수 있어요</small>
             </div>
-            <Link to="/words" className="home-text-link">
-              보관함 <Icon name="arrow" />
-            </Link>
-          </div>
-          {WORDS.slice(0, 2).map((word) => (
-            <Link className="home-word" to="/words" key={word.word}>
-              <span aria-hidden="true">{word.emoji}</span>
-              <div>
-                <h3>{word.word}</h3>
-                <p>{word.meaning}</p>
-              </div>
+            <span className="round-arrow">
               <Icon name="arrow" />
-            </Link>
-          ))}
-        </section>
+            </span>
+          </Link>
+        ))}
       </div>
 
-      <section className="home-section home-friends" aria-labelledby="home-friends-title">
-        <div className="home-section-heading">
-          <div>
-            <span className="home-eyebrow">같은 질문에도 생각은 저마다 달라</span>
-            <h2 id="home-friends-title">친구들은 어떤 상상을 했을까?</h2>
-            <p>친구의 이야기를 읽다 보면 새로운 생각이 떠오를 거야.</p>
-          </div>
-          <Link to="/community" className="home-text-link">
-            친구들 이야기 모두 보기 <Icon name="arrow" />
+      {data.resume && (
+        <div className="home-lower">
+          <section className="continue-card">
+            <div className="story-mini-cover">📝</div>
+            <div>
+              <span className="eyebrow">CONTINUE MY ADVENTURE</span>
+              <h2>{data.resume.title}</h2>
+              <p>이 기기에 작성 중인 모험이 있어요.</p>
+              <Link className="btn light" to={`/session/${data.resume.track}`}>
+                이어 하기 <Icon name="arrow" />
+              </Link>
+            </div>
+          </section>
+        </div>
+      )}
+    </>
+  );
+}
+
+function SignedInHome() {
+  const { client, user } = useAuth();
+  const [home, setHome] = useState<HomeResponse | null>(null);
+  const [homeError, setHomeError] = useState('');
+  const [categories, setCategories] = useState<TopicCategory[]>([]);
+  const [active, setActive] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  // 목록은 "어떤 조건으로 받은 결과인가"를 함께 들고 있다. 조건이 바뀌면 그대로 불러오는 중이 된다.
+  const [result, setResult] = useState<{
+    key: string;
+    items: TopicListItem[];
+    cursor: string | null;
+    error: string;
+  } | null>(null);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const loadCategories = useCallback(() => {
+    listTopicCategories(client).then(
+      (page) => setCategories(page.items),
+      () => setCategories([]),
+    );
+  }, [client]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    getHome(client, controller.signal).then(
+      (response) => {
+        if (!controller.signal.aborted) setHome(response);
+      },
+      (error: unknown) => {
+        if (controller.signal.aborted || (error instanceof V1Error && error.status === 401)) return;
+        setHomeError(errorText(error, '오늘의 이야기를 불러오지 못했어요.'));
+      },
+    );
+    return () => controller.abort();
+  }, [client]);
+
+  useEffect(loadCategories, [loadCategories]);
+
+  const selected = categories.find((item) => item.id === active) ?? null;
+  const topicQuery = useMemo(
+    () => ({
+      limit: TOPIC_LIMIT,
+      ...(active === null && !query ? { recommended: true } : {}),
+      // 서버는 기본 카테고리 코드만 받는다. 내가 만든 카테고리는 그 이름으로 찾아 준다.
+      ...(selected?.kind === 'DEFAULT' ? { category: selected.id } : {}),
+      ...(query ? { query } : selected?.kind === 'USER' ? { query: selected.name } : {}),
+    }),
+    [active, query, selected],
+  );
+  const key = JSON.stringify(topicQuery);
+
+  // 카테고리·검색어가 바뀌면 주제 목록을 처음부터 다시 읽는다.
+  useEffect(() => {
+    const controller = new AbortController();
+    listTopicPage(client, topicQuery, controller.signal).then(
+      (page) => {
+        if (!controller.signal.aborted)
+          setResult({ key, items: page.items, cursor: page.nextCursor, error: '' });
+      },
+      (error: unknown) => {
+        if (controller.signal.aborted || (error instanceof V1Error && error.status === 401)) return;
+        setResult({
+          key,
+          items: [],
+          cursor: null,
+          error: errorText(error, '주제를 불러오지 못했어요.'),
+        });
+      },
+    );
+    return () => controller.abort();
+  }, [client, key, topicQuery]);
+
+  const fresh = result?.key === key ? result : null;
+  const cursor = fresh?.cursor ?? null;
+
+  const loadMore = () => {
+    if (!cursor) return;
+    setLoadingMore(true);
+    listTopicPage(client, { ...topicQuery, cursor })
+      .then((page) =>
+        setResult((current) =>
+          current?.key === key
+            ? { ...current, items: [...current.items, ...page.items], cursor: page.nextCursor }
+            : current,
+        ),
+      )
+      .catch((error: unknown) =>
+        setResult((current) =>
+          current?.key === key
+            ? { ...current, error: errorText(error, '더 불러오지 못했어요.') }
+            : current,
+        ),
+      )
+      .finally(() => setLoadingMore(false));
+  };
+
+  const nickname = home?.profile.nickname?.trim() || '친구';
+  const activeName = selected?.name;
+
+  return (
+    <>
+      <section className="welcome-strip">
+        <div className="welcome-avatar">🧒🏻</div>
+        <div className="welcome-copy">
+          <span className="eyebrow">TODAY WITH TIKI</span>
+          <h1>{nickname}야, 오늘도 네 생각이 궁금해!</h1>
+          <p>말로 편하게 이야기하면 티키가 멋진 글로 만들어 줄게.</p>
+        </div>
+        {(home?.profile.needsFirstGreeting ?? user?.needsFirstGreeting) && (
+          <Link className="first-hello" to="/first-talk">
+            👋 티키와 첫 인사
           </Link>
-        </div>
-        <div className="home-friend-grid">
-          {COMMUNITY_STORIES.map((story) => (
-            <Link to={`/community/${story.id}`} className="home-friend-card" key={story.id}>
-              <div className="home-friend-cover">
-                <span aria-hidden="true">{story.emoji}</span>
-                <span className="home-friend-category">{story.category}</span>
-              </div>
-              <div className="home-friend-copy">
-                <span className="home-record-label">{story.author}의 예시 이야기</span>
-                <h3>{story.title}</h3>
-                <p>{story.excerpt}</p>
-                <span className="home-question-action">
-                  이야기 읽기 <Icon name="arrow" />
-                </span>
-              </div>
-            </Link>
-          ))}
-        </div>
+        )}
+        {home && <HomeWeeklyBadge weekly={home.weeklyActivity} />}
       </section>
-    </div>
+
+      {homeError && <Notice variant="error">{homeError}</Notice>}
+      {!home && !homeError && (
+        <div className="route-loading" role="status">
+          오늘의 추천을 고르는 중이에요…
+        </div>
+      )}
+      {home?.recommendations[0] && <HomeHeroTopic topic={home.recommendations[0]} />}
+
+      <TopicCategoryBar
+        client={client}
+        categories={categories}
+        active={active}
+        onSelect={setActive}
+        onChanged={loadCategories}
+      />
+
+      <div className="section-title">
+        <div>
+          <span className="eyebrow">PICK A QUESTION</span>
+          <h2>
+            {query
+              ? `“${query}” 이야기를 찾았어요`
+              : activeName
+                ? `${activeName}에 대해 이야기해 볼까?`
+                : '오늘 무슨 이야기를 해 볼까?'}
+          </h2>
+        </div>
+        <Link to="/talk">모든 주제 보기 →</Link>
+      </div>
+
+      <div className="row between wrap">
+        <label className="search-field">
+          <Icon name="search" />
+          <input
+            aria-label="주제 검색"
+            placeholder="궁금한 낱말로 찾아보기"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') setQuery(search.trim());
+            }}
+          />
+        </label>
+        <div className="row">
+          <Button className="light small" onClick={() => setQuery(search.trim())}>
+            찾기
+          </Button>
+          {query && (
+            <Button
+              className="ghost small"
+              onClick={() => {
+                setSearch('');
+                setQuery('');
+              }}
+            >
+              지우기
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {fresh?.error && <Notice variant="error">{fresh.error}</Notice>}
+      {!fresh && (
+        <div className="route-loading" role="status">
+          주제를 고르는 중이에요…
+        </div>
+      )}
+      {fresh?.items.length ? <HomeTopicGrid topics={fresh.items} /> : null}
+      {fresh?.items.length === 0 && !fresh.error && (
+        <EmptyState
+          title="이 갈래에는 아직 주제가 없어요."
+          description="다른 카테고리를 고르거나 내가 궁금한 것을 직접 만들어 볼까요?"
+          to="/topics/new"
+          action="내 주제 만들기"
+        />
+      )}
+      {cursor && (
+        <div className="actions">
+          <Button className="light" onClick={loadMore} disabled={loadingMore}>
+            {loadingMore ? '불러오는 중…' : '주제 더 보기'}
+          </Button>
+        </div>
+      )}
+
+      <div className="home-lower">
+        <HomeResumeCard resume={home?.resume ?? null} />
+        <HomeWordPeek words={(home?.recentWords ?? []) as HomeRecentWord[]} />
+      </div>
+
+      <HomeCommunityPeek
+        nickname={nickname}
+        stories={(home?.communityStories ?? []) as HomeCommunityStoryPreview[]}
+      />
+    </>
   );
 }

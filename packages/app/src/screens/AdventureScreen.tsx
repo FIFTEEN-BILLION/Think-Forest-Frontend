@@ -1,5 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { getActivity, listActivities } from '../api/v1/endpoints';
+import type { ActivityDetail } from '../api/v1/types';
+import { useAuth } from '../providers/AuthProvider';
+import { beginServerSession } from '../components/ActivitySessionBar';
+import { filterCatalog, localEntry, serverEntry } from '../components/ActivityCatalog';
+import type { CatalogEntry } from '../components/ActivityCatalog';
+import { cancelSession, linkedSessionId, writeLink } from '../components/ActivitySync';
 import { CATALOG, PLACES, TRACKS } from '../data/catalog';
 import { useVillage } from '../providers/VillageProvider';
 import {
@@ -50,14 +57,46 @@ export function AdventureScreen() {
       : '';
   const [search, setSearch] = useState('');
   const { data, start } = useVillage();
+  const { client, status } = useAuth();
   const navigate = useNavigate();
+  const [serverList, setServerList] = useState<CatalogEntry[] | null>(null);
+  const [starting, setStarting] = useState(false);
+  const [detail, setDetail] = useState<ActivityDetail | null>(null);
   const selectedTrack = TRACKS.includes(track as Track) ? (track as Track) : null;
   const activity = CATALOG.find((a) => a.id === activityId && a.track === track);
+
+  // 목록은 서버가 원본이다. 로그인 전이거나 실패하면 이 기기 목록으로 그린다.
+  useEffect(() => {
+    if (status !== 'signedIn' || activityId) return;
+    const controller = new AbortController();
+    listActivities(client, { limit: 50 }, controller.signal).then(
+      (page) => !controller.signal.aborted && setServerList(page.items.map(serverEntry)),
+      () => !controller.signal.aborted && setServerList(null),
+    );
+    return () => controller.abort();
+  }, [client, status, activityId]);
+
+  // 활동 소개·단계는 서버 상세를 쓴다. 그림과 미션 화면은 이 기기 구성 그대로 둔다.
+  useEffect(() => {
+    if (status !== 'signedIn' || !activityId) return;
+    const controller = new AbortController();
+    getActivity(client, activityId, controller.signal).then(
+      (response) => !controller.signal.aborted && setDetail(response.activity),
+      () => !controller.signal.aborted && setDetail(null),
+    );
+    return () => controller.abort();
+  }, [client, status, activityId]);
+
+  const entries = useMemo(
+    () => filterCatalog(serverList ?? CATALOG.map(localEntry), selectedTrack, search),
+    [serverList, selectedTrack, search],
+  );
+
   if ((activityId && !activity) || (track && !selectedTrack))
     return (
       <EmptyState title="이 모험을 찾지 못했어요." description="모험 목록에서 다시 골라 주세요." />
     );
-  const begin = () => {
+  const begin = async () => {
     if (!activity) return;
     const next = `/adventures/${activity.track}/${activity.id}${preview}`;
     if (!data.consent.done) {
@@ -65,7 +104,21 @@ export function AdventureScreen() {
       return;
     }
     const draft = start(activity.track, activity.id);
-    if (draft) navigate(`/session/${draft.track}${preview}`);
+    if (!draft) return;
+    // 로그인했으면 서버 세션을 함께 연다. 실패해도 이 기기 초안으로 계속 진행한다.
+    if (status === 'signedIn') {
+      setStarting(true);
+      await beginServerSession(client, draft);
+      setStarting(false);
+    }
+    navigate(`/session/${draft.track}${preview}`);
+  };
+  /** 작성 중인 모험을 정리할 때 서버 세션도 함께 취소한다. */
+  const discardServerSession = (draftId: string) => {
+    const sessionId = linkedSessionId(draftId);
+    writeLink(draftId, null);
+    if (sessionId && status === 'signedIn')
+      void cancelSession(client, sessionId).catch(() => undefined);
   };
   if (activity)
     return (
@@ -76,8 +129,8 @@ export function AdventureScreen() {
         </Link>
         <PageHeading
           eyebrow="BEFORE OUR ADVENTURE"
-          title={activity.title}
-          description={activity.subtitle}
+          title={detail?.title ?? activity.title}
+          description={detail?.subtitle ?? activity.subtitle}
         />
         <div className="learning-grid">
           <article className="story-card">
@@ -95,10 +148,10 @@ export function AdventureScreen() {
                 <span className={`tag ${PLACES[activity.track].color}`}>
                   {PLACES[activity.track].name}
                 </span>
-                <span className="tag">약 {activity.duration}분</span>
+                <span className="tag">약 {detail?.estimatedMinutes ?? activity.duration}분</span>
               </div>
-              <h2 className="space-top">{activity.subtitle}</h2>
-              <p>{activity.description}</p>
+              <h2 className="space-top">{detail?.subtitle ?? activity.subtitle}</h2>
+              <p>{detail?.description ?? activity.description}</p>
               <Provenance />
             </div>
           </article>
@@ -110,7 +163,7 @@ export function AdventureScreen() {
                 ? THINKING_STEPS
                 : activity.id === 'path-teaching'
                   ? PATH_STEPS
-                  : PLACES[activity.track].steps
+                  : (detail?.steps ?? PLACES[activity.track].steps)
               ).map((s, i) => (
                 <li key={s}>
                   <span>{String(i + 1).padStart(2, '0')}</span>
@@ -143,15 +196,17 @@ export function AdventureScreen() {
                 <Link to={`/session/${data.resume.track}`} className="btn">
                   진행 중인 모험 이어하기
                 </Link>
-                <DiscardDraft />
+                <DiscardDraft onDone={() => discardServerSession(data.resume!.id)} />
               </>
             ) : (
-              <Button onClick={begin}>
-                {!data.consent.done
-                  ? '시작 준비하고 모험 떠나기'
-                  : activity.track === 'theater'
-                    ? '보호자와 이야기 준비하기'
-                    : '이 모험 시작하기'}
+              <Button onClick={() => void begin()} disabled={starting}>
+                {starting
+                  ? '모험을 준비하는 중…'
+                  : !data.consent.done
+                    ? '시작 준비하고 모험 떠나기'
+                    : activity.track === 'theater'
+                      ? '보호자와 이야기 준비하기'
+                      : '이 모험 시작하기'}
                 <Icon name="arrow" />
               </Button>
             )}
@@ -159,11 +214,6 @@ export function AdventureScreen() {
         </div>
       </>
     );
-  const activities = CATALOG.filter(
-    (a) =>
-      (!selectedTrack || a.track === selectedTrack) &&
-      `${a.title} ${a.tags.join(' ')}`.includes(search),
-  );
   return (
     <>
       <PageHeading
@@ -201,7 +251,7 @@ export function AdventureScreen() {
         </label>
       </div>
       <div className="cards books">
-        {activities.map((a) => (
+        {entries.map((a) => (
           <article className="book" key={a.id}>
             <div className={`book-cover ${PLACES[a.track].color}`}>
               <span className="eyebrow">{PLACES[a.track].area}</span>
@@ -218,7 +268,7 @@ export function AdventureScreen() {
               </div>
               <h3 className="space-top">{a.subtitle}</h3>
               <p>{a.description}</p>
-              <small className="muted">약 {Math.max(15, a.duration)}분 · 자유롭게 이야기해요</small>
+              <small className="muted">약 {Math.max(15, a.minutes)}분 · 자유롭게 이야기해요</small>
               <Link className="btn light" to={`/adventures/${a.track}/${a.id}`}>
                 모험 자세히 보기
                 <Icon name="arrow" />
@@ -227,7 +277,7 @@ export function AdventureScreen() {
           </article>
         ))}
       </div>
-      {!activities.length && (
+      {!entries.length && (
         <EmptyState
           title="아직 준비되지 않은 모험이에요."
           description="다른 검색어를 입력하거나 전체 모험을 살펴보세요."

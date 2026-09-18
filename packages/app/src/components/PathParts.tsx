@@ -11,14 +11,7 @@ import {
   runProgram,
   stepText,
 } from '../lib/path';
-import type {
-  Heading,
-  InnerStep,
-  PathInquiry,
-  PathMap,
-  PathRun,
-  ProgramStep,
-} from '../types/village';
+import type { Heading, InnerStep, PathInquiry, PathMap, PathRun, ProgramStep } from '../types/village';
 
 const ARROW: Record<Heading, string> = { up: '↑', right: '→', down: '↓', left: '←' };
 export type TikiEffect = 'splash' | 'bump' | 'arrive' | null;

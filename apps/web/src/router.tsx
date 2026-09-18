@@ -1,123 +1,88 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { HomeScreen, NotFoundScreen, VillageRoot } from '@jjcp/app/screens';
+import { VillageRoot } from '@jjcp/app/screens';
+import { NotFoundScreen } from '@jjcp/app/screens/NotFoundScreen';
 
-const parent = () => import('@jjcp/app/village/ParentScreen');
-const library = () => import('@jjcp/app/village/LibraryScreen');
-const experience = () => import('@jjcp/app/village/ExperienceScreen');
-const login = () => import('@jjcp/app/village/LoginScreen');
+// main 의 묶음 모듈을 그대로 쓴다. 본문은 API v1 판 화면이 들고 있다.
+const readers = () => import('@jjcp/app/screens/ReaderScreens');
+const learning = () => import('@jjcp/app/screens/LearningScreens');
+const parents = () => import('@jjcp/app/screens/ParentScreens');
+const login = () => import('@jjcp/app/screens/LoginScreen');
 // 보호자 화면(F3). ProtectedParentScreen 안에서만 열리므로 GuardianProvider 를 함께 쓴다.
-const guardianConsent = () => import('@jjcp/app/village/guardian/ConsentScreen');
-const guardianLinks = () => import('@jjcp/app/village/guardian/LinksScreen');
-const guardianInvite = () => import('@jjcp/app/village/guardian/InviteAcceptScreen');
-const guardianShare = () => import('@jjcp/app/village/guardian/ShareApprovalScreen');
-const guardianProgress = () => import('@jjcp/app/village/guardian/ProgressScreen');
-const guardianSafety = () => import('@jjcp/app/village/guardian/SafetyScreen');
-const guardianConsultation = () => import('@jjcp/app/village/guardian/ConsultationScreen');
-const adventures = async () => ({
-  Component: (await import('@jjcp/app/village/AdventureScreen')).AdventureScreen,
-});
+const guardianConsent = () => import('@jjcp/app/screens/guardian/ConsentScreen');
+const guardianLinks = () => import('@jjcp/app/screens/guardian/LinksScreen');
+const guardianInvite = () => import('@jjcp/app/screens/guardian/InviteAcceptScreen');
+const guardianShare = () => import('@jjcp/app/screens/guardian/ShareApprovalScreen');
+const guardianProgress = () => import('@jjcp/app/screens/guardian/ProgressScreen');
+const guardianSafety = () => import('@jjcp/app/screens/guardian/SafetyScreen');
+const guardianConsultation = () => import('@jjcp/app/screens/guardian/ConsultationScreen');
 
 export const router = createBrowserRouter([
   {
     path: '/',
     Component: VillageRoot,
-    hydrateFallbackElement: (
-      <div className="route-loading" role="status">
-        우리 아이 생각친구, 티키를 열고 있어요…
-      </div>
-    ),
     ErrorBoundary: NotFoundScreen,
+    hydrateFallbackElement: <p role="status">티키를 열고 있어요…</p>,
     children: [
-      { index: true, Component: HomeScreen },
-      { path: 'adventures', lazy: adventures },
-      { path: 'adventures/:track', lazy: adventures },
-      { path: 'adventures/:track/:activityId', lazy: adventures },
+      { index: true, lazy: async () => ({ Component: (await readers()).ServerHome }) },
       { path: 'login', lazy: async () => ({ Component: (await login()).LoginScreen }) },
       {
         // 서버 대화(티키와 첫인사·티키와 이야기)만 로그인이 필요하다.
         lazy: async () => ({ Component: (await login()).RequireAuth }),
         children: [
-          {
-            path: 'talk',
-            lazy: async () => ({
-              Component: (await import('@jjcp/app/village/ConversationScreen')).ConversationScreen,
-            }),
-          },
+          { path: 'talk', lazy: async () => ({ Component: (await learning()).ServerTalk }) },
           {
             path: 'first-talk',
-            lazy: async () => ({
-              Component: (await import('@jjcp/app/village/FirstTalkScreen')).FirstTalkScreen,
-            }),
+            lazy: async () => ({ Component: (await learning()).ServerFirstTalk }),
           },
         ],
       },
-      {
-        path: 'words',
-        lazy: async () => ({
-          Component: (await import('@jjcp/app/village/WordsScreen')).WordsScreen,
-        }),
-      },
-      {
-        path: 'community',
-        lazy: async () => ({
-          Component: (await import('@jjcp/app/village/CommunityScreen')).CommunityScreen,
-        }),
-      },
-      {
-        path: 'community/:id',
-        lazy: async () => ({ Component: (await experience()).CommunityStoryScreen }),
-      },
-      {
-        path: 'story-share',
-        lazy: async () => ({ Component: (await experience()).ShareStoryScreen }),
-      },
-      {
-        path: 'topics/new',
-        lazy: async () => ({ Component: (await experience()).CustomTopicScreen }),
-      },
+      ...['adventures', 'adventures/:track', 'adventures/:track/:activityId'].map((path) => ({
+        path,
+        lazy: async () => ({ Component: (await learning()).ServerAdventures }),
+      })),
       {
         path: 'session/:track',
-        lazy: async () => ({
-          Component: (await import('@jjcp/app/village/SessionScreen')).SessionScreen,
-        }),
+        lazy: async () => ({ Component: (await learning()).ServerActivity }),
       },
-      { path: 'complete/:id', lazy: async () => ({ Component: (await library()).CompleteScreen }) },
-      { path: 'shelf', lazy: async () => ({ Component: (await library()).LibraryScreen }) },
+      { path: 'shelf', lazy: async () => ({ Component: (await readers()).ServerLibrary }) },
+      { path: 'shelf/:id', lazy: async () => ({ Component: (await readers()).ServerRecord }) },
+      { path: 'complete/:id', lazy: async () => ({ Component: (await readers()).ServerComplete }) },
+      { path: 'words', lazy: async () => ({ Component: (await readers()).ServerWords }) },
+      { path: 'community', lazy: async () => ({ Component: (await readers()).ServerCommunity }) },
       {
-        path: 'shelf/:id',
-        lazy: async () => ({ Component: (await library()).RecordDetailScreen }),
+        path: 'community/:id',
+        lazy: async () => ({ Component: (await readers()).ServerCommunityStory }),
       },
+      { path: 'story-share', lazy: async () => ({ Component: (await readers()).ServerShare }) },
+      { path: 'topics/new', lazy: async () => ({ Component: (await readers()).ServerTopics }) },
+      { path: 'report', lazy: async () => ({ Component: (await parents()).ServerReport }) },
       {
-        path: 'report',
-        lazy: async () => ({
-          Component: (await import('@jjcp/app/village/ReportScreen')).ReportScreen,
-        }),
-      },
-      {
-        lazy: async () => ({ Component: (await parent()).ProtectedParentScreen }),
+        lazy: async () => ({ Component: (await parents()).ProtectedParentScreen }),
         children: [
-          { path: 'profile', lazy: async () => ({ Component: (await parent()).ProfileScreen }) },
-          { path: 'tech', lazy: async () => ({ Component: (await parent()).TechScreen }) },
-          { path: 'data', lazy: async () => ({ Component: (await parent()).DataScreen }) },
+          { path: 'profile', lazy: async () => ({ Component: (await parents()).ServerProfile }) },
+          { path: 'data', lazy: async () => ({ Component: (await parents()).ServerData }) },
+          { path: 'tech', lazy: async () => ({ Component: (await parents()).ServerTech }) },
           {
             path: 'guardian/consent',
-            lazy: async () => ({ Component: (await guardianConsent()).GuardianConsentScreen }),
+            lazy: async () => ({
+              Component: (await guardianConsent()).GuardianConsentScreen,
+            }),
           },
           {
             path: 'guardian/links',
             lazy: async () => ({ Component: (await guardianLinks()).GuardianLinksScreen }),
           },
-          {
-            path: 'guardian/invite',
-            lazy: async () => ({ Component: (await guardianInvite()).GuardianInviteAcceptScreen }),
-          },
-          {
-            path: 'guardian/invite/:token',
-            lazy: async () => ({ Component: (await guardianInvite()).GuardianInviteAcceptScreen }),
-          },
+          ...['guardian/invite', 'guardian/invite/:token'].map((path) => ({
+            path,
+            lazy: async () => ({
+              Component: (await guardianInvite()).GuardianInviteAcceptScreen,
+            }),
+          })),
           {
             path: 'guardian/share',
-            lazy: async () => ({ Component: (await guardianShare()).GuardianShareScreen }),
+            lazy: async () => ({
+              Component: (await guardianShare()).GuardianShareScreen,
+            }),
           },
           {
             path: 'guardian/report',

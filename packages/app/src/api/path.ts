@@ -4,7 +4,7 @@
 import type { ApiRequest } from './client';
 import { jsonBody } from './client';
 import type { InputOrigin, InquiryMeta } from './inquiry';
-import type { HeardPhrase, PathOutcome, ProgramStep } from '../features/village/types';
+import type { HeardPhrase, PathOutcome, ProgramStep } from '../types/village';
 
 export interface PathTeachRequest {
   text: string;

@@ -6,6 +6,7 @@ import { ApiClientProvider } from '../api/ApiClientProvider';
 import { createQueryClient } from '../api/queryClient';
 import { theme } from '../styles/theme';
 import { AuthProvider } from './AuthProvider';
+import { BackendProvider } from './BackendProvider';
 
 type AppProvidersProps = PropsWithChildren<{
   /** 자람마을 백엔드 주소. 웹 진입점이 환경변수에서 읽어 넘긴다. */
@@ -16,6 +17,10 @@ type AppProvidersProps = PropsWithChildren<{
   devLogin?: boolean;
 }>;
 
+/**
+ * 인증은 AuthProvider(=api/v1 클라이언트)가 한 곳에서 맡는다.
+ * BackendProvider 는 그 세션을 빌려 쓰는 레거시/생성 스키마 전송 계층이라 반드시 안쪽에 둔다.
+ */
 export function AppProviders({
   apiBaseUrl,
   v1BaseUrl,
@@ -29,7 +34,7 @@ export function AppProviders({
       <QueryClientProvider client={queryClient}>
         <ApiClientProvider baseUrl={apiBaseUrl}>
           <AuthProvider baseUrl={v1BaseUrl} devLoginEnabled={devLogin}>
-            {children}
+            <BackendProvider devLoginEnabled={devLogin}>{children}</BackendProvider>
           </AuthProvider>
         </ApiClientProvider>
       </QueryClientProvider>

@@ -8,19 +8,29 @@ export class ApiError extends Error {
   }
 }
 
+export function resolveApiUrl(baseUrl: string, path: string) {
+  const base = baseUrl.replace(/\/$/, '');
+  const relative = path.replace(/^\//, '');
+  const resolved =
+    base.endsWith('/api') && relative.startsWith('api/') ? relative.slice(4) : relative;
+  return `${base}/${resolved}`;
+}
+
 // Pass the deployment's API base URL when creating a client.
 export function createApiClient(baseUrl: string) {
   return async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const headers = new Headers(options.headers);
     if (!headers.has('Accept')) headers.set('Accept', 'application/json');
 
-    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/${path.replace(/^\//, '')}`, {
+    const response = await fetch(resolveApiUrl(baseUrl, path), {
       ...options,
       headers,
     });
 
     if (!response.ok) throw new ApiError(response.status, await response.text());
     if (response.status === 204) return undefined as T;
+    if (/^(audio\/|application\/zip)/.test(response.headers.get('content-type') ?? ''))
+      return (await response.blob()) as T;
     return response.json() as Promise<T>;
   };
 }

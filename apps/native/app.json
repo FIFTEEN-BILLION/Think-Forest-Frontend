@@ -4,16 +4,6 @@
     "slug": "jjcp",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "light",
-    "ios": {
-      "supportsTablet": true,
-      "infoPlist": {
-        "NSMicrophoneUsageDescription": "티키에게 말로 이야기할 때 목소리를 듣기 위해 마이크를 사용합니다. 목소리는 저장하지 않고 글자로 바꾼 뒤 바로 지웁니다.",
-        "NSSpeechRecognitionUsageDescription": "말한 내용을 글자로 바꿔 대화 입력창에 넣기 위해 사용합니다."
-      }
-    },
-    "android": {
-      "permissions": ["RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS", "INTERNET"]
-    }
+    "userInterfaceStyle": "light"
   }
 }

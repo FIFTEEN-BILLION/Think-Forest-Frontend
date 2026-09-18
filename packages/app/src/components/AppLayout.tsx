@@ -1,6 +1,5 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { VillageProvider, useVillage } from '../providers/VillageProvider';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import { Notice } from './ui';
 import type { Theme } from '../types/village';
@@ -8,7 +7,7 @@ import { useBackend } from '../providers/BackendProvider';
 import { BackendGate, BackendStatus } from './BackendGate';
 import { useServerQuery, useAction } from '../hooks/useServerApi';
 import { json } from '../api/requestOptions';
-import { ServerRoutes } from '../navigation/ServerRoutes';
+import type { Model } from '../api/schema';
 const navigation = [
   { to: '/', label: '오늘의 이야기', icon: 'home' },
   { to: '/shelf', label: '나의 책장', icon: 'book' },
@@ -17,53 +16,44 @@ const navigation = [
   { to: '/report', label: '나의 발자국', icon: 'chart' },
 ];
 export function VillageRoot() {
-  return (
-    <VillageProvider>
-      <AppLayout />
-    </VillageProvider>
-  );
-}
-function AppLayout() {
-  const { data, update, storageError, message } = useVillage();
   const backend = useBackend();
+  const navigate = useNavigate();
   const themeAction = useAction();
-  const settings = useServerQuery<{ settings: { theme: string; version: number } }>(
-    backend.me?.profile ? `profiles/${backend.me.profile.id}/settings` : null,
+  const profileAction = useAction();
+  const settings = useServerQuery<Model<'SettingsResponse'>>(
+    backend.profileId ? `profiles/${backend.profileId}/settings` : null,
   );
-  const theme = backend.demo
-    ? data.settings.theme
-    : ((settings.data?.settings.theme.toLowerCase() ?? 'auto') as Theme);
+  const profiles = useServerQuery<Model<'ProfileListResponse'>>('profiles');
+  const theme = (settings.data?.settings.theme.toLowerCase() ?? 'auto') as Theme;
   useEffect(() => {
     if (theme === 'auto') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.dataset.theme = theme;
   }, [theme]);
-  const displayName = backend.demo
-    ? data.profile.name
-    : (backend.me?.profile?.nickname ?? (backend.me?.user.role === 'GUARDIAN' ? '보호자' : '새싹'));
+  const selectedProfile = profiles.data?.items.find((p) => p.id === backend.profileId);
+  const displayName = selectedProfile?.nickname || backend.me?.profile?.nickname || '새싹';
   const [menu, setMenu] = useState(false);
   const location = useLocation();
   const sidebar = useRef<HTMLElement>(null);
-  const title =
-    location.pathname === '/session/lab' && data.resume?.activityId === 'first-inquiry'
-      ? '첫 탐구'
-      : location.pathname === '/session/lab' && data.resume?.activityId === 'path-teaching'
-        ? '티키 가르치기'
-        : location.pathname.startsWith('/login')
-          ? '로그인'
-          : location.pathname.startsWith('/first-talk')
-            ? '티키와 첫 인사'
-            : location.pathname.startsWith('/talk')
-              ? '티키와 대화하기'
-              : location.pathname.startsWith('/topics/new')
-                ? '내가 주제 정하기'
-                : location.pathname.startsWith('/story-share')
-                  ? '내 이야기 공유하기'
-                  : location.pathname.startsWith('/profile')
-                    ? '내 프로필과 설정'
-                    : location.pathname.startsWith('/data')
-                      ? '내 기록 관리'
-                      : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))
-                          ?.label ?? '오늘의 이야기');
+  const title = location.pathname.startsWith('/first-talk')
+    ? '티키와 첫 인사'
+    : location.pathname.startsWith('/talk')
+      ? '티키와 대화하기'
+      : location.pathname.startsWith('/login')
+        ? '로그인'
+        : location.pathname.startsWith('/topics/new')
+          ? '내가 주제 정하기'
+          : location.pathname.startsWith('/story-share')
+            ? '내 이야기 공유하기'
+            : location.pathname.startsWith('/profile')
+              ? '내 프로필과 설정'
+              : location.pathname.startsWith('/data')
+                ? '내 기록 관리'
+                : location.pathname.startsWith('/tech')
+                  ? '티키와 기록 안내'
+                  : /^\/(adventures|session)/.test(location.pathname)
+                    ? '생각 모험'
+                    : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))
+                        ?.label ?? '오늘의 이야기');
   useEffect(() => {
     document.title = `${title} · 우리 아이 생각친구, 티키`;
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -101,24 +91,17 @@ function AppLayout() {
   }, [menu]);
   const cycleTheme = () => {
     const themes: Theme[] = ['auto', 'light', 'dark'];
-    if (!backend.demo) {
-      if (settings.data && backend.me?.profile)
-        void themeAction.run(async () => {
-          await backend.request(
-            `profiles/${backend.me!.profile!.id}/settings`,
-            json(
-              { theme: themes[(themes.indexOf(theme) + 1) % 3]!.toUpperCase() },
-              'PATCH',
-              settings.data!.settings.version,
-            ),
-          );
-        });
-      return;
-    }
-    update((p) => ({
-      ...p,
-      settings: { ...p.settings, theme: themes[(themes.indexOf(p.settings.theme) + 1) % 3]! },
-    }));
+    if (settings.data && backend.profileId)
+      void themeAction.run(async () => {
+        await backend.request(
+          `profiles/${backend.profileId}/settings`,
+          json(
+            { theme: themes[(themes.indexOf(theme) + 1) % 3]!.toUpperCase() },
+            'PATCH',
+            settings.data!.settings.version,
+          ),
+        );
+      });
   };
   return (
     <>
@@ -188,10 +171,18 @@ function AppLayout() {
             <span>
               <strong>{displayName}의 작은 마을</strong>
               <small>
-                {backend.demo ? data.profile.grade : (backend.me?.profile?.gradeOrAgeBand ?? '')}
+                {selectedProfile?.gradeOrAgeBand ?? backend.me?.profile?.gradeOrAgeBand ?? ''}
               </small>
             </span>
           </Link>
+          <div className="side-utility">
+            <Link to="/data" onClick={() => setMenu(false)}>
+              내 기록 관리
+            </Link>
+            <Link to="/tech" onClick={() => setMenu(false)}>
+              티키 안내
+            </Link>
+          </div>
           <span className="status">안전한 어린이 모드</span>
         </div>
       </aside>
@@ -221,11 +212,39 @@ function AppLayout() {
             </div>
           </div>
           <div className="top-actions">
-            <span className="status">{backend.demo ? '예시 화면' : '내 기록'}</span>
+            {!!profiles.data?.items.filter((p) => p.role === 'OWNER').length && (
+              <select
+                className="profile-switcher"
+                aria-label="아이 프로필"
+                value={backend.profileId}
+                disabled={profileAction.busy}
+                onChange={(e) => {
+                  const profile = profiles.data?.items.find((p) => p.id === e.target.value);
+                  if (profile)
+                    void profileAction.run(async () => {
+                      await backend.request(
+                        `profiles/${profile.id}`,
+                        json({ makeDefault: true }, 'PATCH', profile.version),
+                      );
+                      await backend.refreshMe();
+                      navigate('/');
+                    });
+                }}
+              >
+                {profiles.data?.items
+                  .filter((p) => p.role === 'OWNER')
+                  .map((p) => (
+                    <option value={p.id} key={p.id}>
+                      {p.nickname || '첫인사 전 아이'}
+                    </option>
+                  ))}
+              </select>
+            )}
+            <span className="status">{backend.me ? '내 기록' : '함께 시작해요'}</span>
             <button
               className="icon-btn"
               onClick={cycleTheme}
-              disabled={!backend.demo && (!settings.data || themeAction.busy)}
+              disabled={!settings.data || themeAction.busy}
               aria-label={`화면 테마 변경, 현재 ${{ auto: '기기 설정', light: '라이트', dark: '다크' }[theme]}`}
             >
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
@@ -237,7 +256,6 @@ function AppLayout() {
         </header>
         <main id="main" tabIndex={-1}>
           <BackendStatus />
-          {backend.demo && storageError && <Notice variant="error">{storageError}</Notice>}
           {themeAction.message && <Notice variant="error">{themeAction.message}</Notice>}
           <Suspense
             fallback={
@@ -248,9 +266,9 @@ function AppLayout() {
             }
           >
             <BackendGate>
-              <ServerRoutes>
+              <div className="api-page" key={backend.scopeId}>
                 <Outlet />
-              </ServerRoutes>
+              </div>
             </BackendGate>
           </Suspense>
           <footer className="footer">
@@ -262,7 +280,7 @@ function AppLayout() {
         </main>
       </div>
       <div className="toast" role="status" aria-live="polite">
-        {message}
+        {profileAction.message}
       </div>
     </>
   );

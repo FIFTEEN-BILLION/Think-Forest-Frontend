@@ -12,8 +12,10 @@ if (!root) throw new Error('Root element is missing.');
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || '/api';
 
 // JJCP API v1 은 같은 출처 /api/v1 (개발: Vite 프록시, 배포: Netlify 프록시)로 부른다.
-// 개발용 로그인 버튼은 호스트가 켤 때만 보인다.
-const devLogin = import.meta.env.VITE_DEV_LOGIN === 'true';
+// 개발 localhost에서는 기본 표시하며 배포 빌드는 명시적으로 켜야 한다.
+const devLogin =
+  import.meta.env.VITE_DEV_LOGIN === 'true' ||
+  (import.meta.env.DEV && import.meta.env.VITE_DEV_LOGIN !== 'false');
 
 createRoot(root).render(
   <StrictMode>

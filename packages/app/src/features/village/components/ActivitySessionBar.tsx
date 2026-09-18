@@ -12,6 +12,7 @@ import { Icon } from './Icon';
 import { Notice } from './ui';
 import {
   advanceSession,
+  autosaveKey,
   cancelSession,
   completeSession,
   fetchSession,
@@ -26,8 +27,8 @@ import {
   writeLink,
 } from './ActivitySync';
 
-/** 글쓰기 자동 저장을 모으는 시간. 글자마다 서버로 보내지 않는다. */
-const TEXT_AUTOSAVE_MS = 800;
+/** 자동 저장을 모으는 시간. 글자마다 서버로 보내지 않는다. */
+const AUTOSAVE_MS = 800;
 
 export interface ActivityFlow {
   /** 로컬 초안을 먼저 바꾸고, 연결된 서버 세션에도 같은 사건을 올린다. */
@@ -60,8 +61,9 @@ export function useActivityFlow(draft: Draft | null): ActivityFlow {
   // 자동 저장은 보낸 순서대로 처리해야 초안 번호가 어긋나지 않는다.
   const queue = useRef<Promise<unknown>>(Promise.resolve());
   const latest = useRef(draft);
-  const textTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pendingText = useRef<ActivityEvent | null>(null);
+  // 자동 저장을 모아 두는 칸(본문·관찰 A/B). 칸마다 따로 모았다가 한 번씩 보낸다.
+  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const pending = useRef(new Map<string, ActivityEvent>());
 
   const draftId = draft?.id ?? null;
   const active = status === 'signedIn' && usesServerSession(draft);
@@ -121,33 +123,42 @@ export function useActivityFlow(draft: Draft | null): ActivityFlow {
     [adopt, client, enqueue],
   );
 
-  /** 글자를 칠 때마다 보내지 않는다. 잠깐 멈추면 그때 한 번 저장한다. */
-  const flushText = useCallback(() => {
-    if (textTimer.current) clearTimeout(textTimer.current);
-    textTimer.current = null;
-    pendingText.current = null;
+  /**
+   * 글자를 칠 때마다 보내지 않는다. 잠깐 멈추면 그때 한 번 저장한다.
+   * 모아 둔 것을 버려도 `preAdvanceEvents` 가 단계를 넘기기 전에 마지막 값을 올린다.
+   */
+  const dropPending = useCallback(() => {
+    timers.current.forEach(clearTimeout);
+    timers.current.clear();
+    pending.current.clear();
   }, []);
 
-  useEffect(() => flushText, [flushText]);
+  useEffect(() => dropPending, [dropPending]);
 
   const send = useCallback(
     (event: LearningEvent) => {
       const ok = localSend(event);
       if (!ok || !active || !sessionId) return ok;
-      const serverEvent = toServerEvent(event);
+      // 지금 초안을 기준으로 옮긴다. 슬라이더는 경계를 처음 넘을 때만 사건이 나온다.
+      const serverEvent = toServerEvent(event, latest.current ?? undefined);
       if (!serverEvent) return ok;
-      if (serverEvent.type !== 'TEXT') {
+      const key = autosaveKey(serverEvent);
+      if (!key) {
         void save(sessionId, serverEvent);
         return ok;
       }
-      pendingText.current = serverEvent;
-      if (textTimer.current) clearTimeout(textTimer.current);
-      textTimer.current = setTimeout(() => {
-        const queued = pendingText.current;
-        textTimer.current = null;
-        pendingText.current = null;
-        if (queued) void save(sessionId, queued);
-      }, TEXT_AUTOSAVE_MS);
+      pending.current.set(key, serverEvent);
+      const running = timers.current.get(key);
+      if (running) clearTimeout(running);
+      timers.current.set(
+        key,
+        setTimeout(() => {
+          const queued = pending.current.get(key);
+          timers.current.delete(key);
+          pending.current.delete(key);
+          if (queued) void save(sessionId, queued);
+        }, AUTOSAVE_MS),
+      );
       return ok;
     },
     [active, localSend, save, sessionId],
@@ -156,7 +167,7 @@ export function useActivityFlow(draft: Draft | null): ActivityFlow {
   const advance = useCallback(() => {
     const current = latest.current;
     if (!current) return;
-    flushText();
+    dropPending();
     setMissing([]);
     if (!active || !sessionId) {
       localSend({ type: 'advance' });
@@ -182,11 +193,11 @@ export function useActivityFlow(draft: Draft | null): ActivityFlow {
         setBusy(false);
       }
     });
-  }, [active, adopt, client, enqueue, flushText, localSend, sessionId]);
+  }, [active, adopt, client, enqueue, dropPending, localSend, sessionId]);
 
   const complete = useCallback(
     (onDone?: (recordId: string) => void) => {
-      flushText();
+      dropPending();
       const finishLocally = () => {
         const id = localFinish();
         if (id && draftId) writeLink(draftId, null);
@@ -225,18 +236,18 @@ export function useActivityFlow(draft: Draft | null): ActivityFlow {
         }
       });
     },
-    [active, adopt, client, draftId, enqueue, flushText, localFinish, sessionId],
+    [active, adopt, client, draftId, enqueue, dropPending, localFinish, sessionId],
   );
 
   const cancel = useCallback(() => {
-    flushText();
+    dropPending();
     if (!draftId) return;
     const id = sessionId;
     writeLink(draftId, null);
     if (id) setDropped(id);
     if (!active || !id) return;
     void enqueue(() => cancelSession(client, id).catch(() => undefined));
-  }, [active, client, draftId, enqueue, flushText, sessionId]);
+  }, [active, client, draftId, enqueue, dropPending, sessionId]);
 
   useEffect(() => {
     if (error) toast(error);

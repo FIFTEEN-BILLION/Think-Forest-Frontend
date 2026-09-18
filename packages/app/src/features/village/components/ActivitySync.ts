@@ -62,18 +62,33 @@ export function writeLink(draftId: string, sessionId: string | null) {
 
 const OBSERVATION_FIELD: Record<string, string> = { a: 'A', b: 'B' };
 
+/** 서버가 두 조건 관찰로 세는 경계값. 로컬 `transition` 의 low/high 판정과 같다. */
+export const LAB_LOW_AT = 30;
+export const LAB_HIGH_AT = 70;
+
+/**
+ * 슬라이더는 움직일 때마다 사건이 쏟아진다. 서버가 보는 것은 "낮은 값·높은 값을 봤는가"뿐이라
+ * 아직 안 본 쪽을 처음 넘어서는 순간에만 올린다. 한 활동에서 많아야 두 번이다.
+ */
+export function crossesNewThreshold(draft: Draft, value: number) {
+  return (value <= LAB_LOW_AT && !draft.lab.low) || (value >= LAB_HIGH_AT && !draft.lab.high);
+}
+
 /**
  * 로컬 학습 사건을 서버 사건으로 옮긴다. 옮길 것이 없으면 null.
  * `advance` 는 사건이 아니라 별도 API 라 여기서 다루지 않는다.
  */
-export function toServerEvent(event: LearningEvent): ActivityEvent | null {
+export function toServerEvent(event: LearningEvent, draft?: Draft): ActivityEvent | null {
   switch (event.type) {
     case 'text':
       return { type: 'TEXT', value: event.text };
     case 'hint':
       return { type: 'HINT' };
     case 'lab-value':
-      return { type: 'LAB_VALUE', value: event.value };
+      // draft 를 모르면(테스트·직접 호출) 그대로 올린다.
+      return !draft || crossesNewThreshold(draft, event.value)
+        ? { type: 'LAB_VALUE', value: event.value }
+        : null;
     case 'observation':
       // 서버는 LOW_LIGHT·HIGH_LIGHT·A·B 만 받는다. 출처(source)는 보관할 자리가 없다.
       return OBSERVATION_FIELD[event.field]
@@ -92,13 +107,28 @@ export function toServerEvent(event: LearningEvent): ActivityEvent | null {
   }
 }
 
+/** 자동 저장을 모아 보낼 때 같은 칸끼리 묶는 이름. 묶지 않는 사건은 null. */
+export function autosaveKey(event: ActivityEvent): string | null {
+  if (event.type === 'TEXT') return 'TEXT';
+  if (event.type === 'OBSERVATION') return `OBSERVATION:${event.field ?? ''}`;
+  return null;
+}
+
 /**
  * 단계를 넘기기 직전에 서버로 올려야 할 사건들.
- * 주제·키워드는 화면이 초안을 직접 고치므로 여기서 한 번에 맞춘다.
+ * 화면이 초안을 직접 고치거나 자동 저장을 모아 두는 칸은 여기서 마지막 값으로 한 번에 맞춘다.
  */
 export function preAdvanceEvents(draft: Draft): ActivityEvent[] {
   if (draft.track === 'lab' && draft.step === 0)
     return draft.lab.mode === 'custom' ? [{ type: 'TOPIC', value: draft.lab.topic }] : [];
+  if (draft.track === 'lab' && draft.step === 2)
+    // 슬라이더 쪽 low/high 는 경계를 넘을 때 이미 올라갔다. 직접 적는 관찰만 마지막 값으로 맞춘다.
+    return draft.lab.mode === 'custom'
+      ? [
+          { type: 'OBSERVATION', field: 'A', value: draft.lab.a },
+          { type: 'OBSERVATION', field: 'B', value: draft.lab.b },
+        ]
+      : [];
   if (draft.track === 'theater' && draft.step === 0)
     return [{ type: 'KEYWORD', value: draft.theater.keyword }];
   // 글쓰기 단계는 자동 저장이 늦었을 수 있으니 마지막 문장을 확실히 올린다.

@@ -145,6 +145,64 @@ test('preAdvanceEvents sends nothing on a step with no input of its own', () => 
   assert.deepEqual(sync.preAdvanceEvents(d), []);
 });
 
+test('preAdvanceEvents settles the two observations the child typed', () => {
+  const d = draft({ step: 2, lab: { ...draft().lab, a: '밝았어요', b: '어두웠어요' } });
+  assert.deepEqual(sync.preAdvanceEvents(d), [
+    { type: 'OBSERVATION', field: 'A', value: '밝았어요' },
+    { type: 'OBSERVATION', field: 'B', value: '어두웠어요' },
+  ]);
+});
+
+test('preAdvanceEvents leaves the slider alone — crossings already went up', () => {
+  const d = draft({
+    activityId: 'shadow',
+    step: 2,
+    lab: { ...draft().lab, mode: 'shadow', low: true, high: true },
+  });
+  assert.deepEqual(sync.preAdvanceEvents(d), []);
+});
+
+// ---------- 슬라이더는 경계를 처음 넘을 때만 올린다 ----------
+
+const slider = (over) =>
+  draft({ activityId: 'shadow', step: 2, lab: { ...draft().lab, mode: 'shadow', ...over } });
+
+test('toServerEvent only saves a slider move that reaches a condition not seen yet', () => {
+  const fresh = slider({});
+  assert.deepEqual(sync.toServerEvent({ type: 'lab-value', value: 20 }, fresh), {
+    type: 'LAB_VALUE',
+    value: 20,
+  });
+  assert.deepEqual(sync.toServerEvent({ type: 'lab-value', value: 85 }, fresh), {
+    type: 'LAB_VALUE',
+    value: 85,
+  });
+  // 가운데 값은 서버가 세는 조건을 바꾸지 않는다.
+  assert.equal(sync.toServerEvent({ type: 'lab-value', value: 50 }, fresh), null);
+  // 이미 본 쪽은 다시 올리지 않는다.
+  assert.equal(sync.toServerEvent({ type: 'lab-value', value: 15 }, slider({ low: true })), null);
+  assert.equal(sync.toServerEvent({ type: 'lab-value', value: 90 }, slider({ high: true })), null);
+});
+
+test('crossesNewThreshold matches the local low/high rule at 30 and 70', () => {
+  assert.equal(sync.LAB_LOW_AT, 30);
+  assert.equal(sync.LAB_HIGH_AT, 70);
+  assert.equal(sync.crossesNewThreshold(slider({}), 30), true);
+  assert.equal(sync.crossesNewThreshold(slider({}), 31), false);
+  assert.equal(sync.crossesNewThreshold(slider({}), 70), true);
+  assert.equal(sync.crossesNewThreshold(slider({}), 69), false);
+});
+
+// ---------- 자동 저장을 모으는 칸 ----------
+
+test('autosaveKey groups the free-text fields and lets the rest go straight out', () => {
+  assert.equal(sync.autosaveKey({ type: 'TEXT', value: '가' }), 'TEXT');
+  assert.equal(sync.autosaveKey({ type: 'OBSERVATION', field: 'A', value: '가' }), 'OBSERVATION:A');
+  assert.equal(sync.autosaveKey({ type: 'OBSERVATION', field: 'B', value: '가' }), 'OBSERVATION:B');
+  assert.equal(sync.autosaveKey({ type: 'LAB_VALUE', value: 20 }), null);
+  assert.equal(sync.autosaveKey({ type: 'CHOICE', value: 1 }), null);
+});
+
 // ---------- 서버 세션을 쓰지 않는 활동 ----------
 
 test('the two missions with their own engine stay on this device', () => {

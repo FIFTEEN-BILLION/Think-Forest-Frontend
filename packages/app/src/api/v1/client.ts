@@ -69,6 +69,8 @@ export interface V1RequestOptions {
   signal?: AbortSignal;
   /** false 면 Authorization 을 붙이지 않고 401 에서 refresh 도 하지 않는다. */
   auth?: boolean;
+  /** 추가 요청 헤더. If-Match 같은 한 번짜리 헤더에 쓴다. */
+  headers?: Record<string, string>;
 }
 
 export interface V1ClientOptions {
@@ -113,6 +115,8 @@ export function createV1Client(options: V1ClientOptions = {}) {
     if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
     if (token) headers.Authorization = `Bearer ${token}`;
     if (opts.idempotencyKey) headers['Idempotency-Key'] = opts.idempotencyKey;
+    // If-Match 처럼 요청마다 다른 헤더(수정 충돌 검사용).
+    for (const [key, value] of Object.entries(opts.headers ?? {})) headers[key] = value;
     try {
       return await doFetch(url(path, opts.query), {
         method: opts.method ?? (opts.body === undefined ? 'GET' : 'POST'),

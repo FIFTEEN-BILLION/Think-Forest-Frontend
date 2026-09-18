@@ -7,10 +7,7 @@ import { test } from 'node:test';
 import ts from 'typescript';
 
 // v1.test.mjs 와 같은 메모리 로더. 음성의 순수 모듈(PCM 변환, WS 상태 기계)만 컴파일한다.
-const root = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../packages/app/src/features/village/voice',
-);
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../packages/app/src/voice');
 const cache = new Map();
 function load(path) {
   if (cache.has(path)) return cache.get(path).exports;

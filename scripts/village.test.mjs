@@ -7,10 +7,7 @@ import { test } from 'node:test';
 import ts from 'typescript';
 
 // Compile the actual pure domain modules in memory; no browser or added test dependency.
-const root = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../packages/app/src/features/village',
-);
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../packages/app/src');
 const cache = new Map();
 function load(path) {
   if (cache.has(path)) return cache.get(path).exports;

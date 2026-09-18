@@ -1,11 +1,30 @@
+> 구조 정리: 화면은 `packages/app/src/screens`, 공통 UI는 `components`, 요청 상태는 `hooks`와 TanStack Query에서 관리합니다. `features` 폴더는 제거했습니다. [현재 구조·캐시 정책](../docs/ARCHITECTURE.md)을 참고하세요.
+
 # 우리 아이 생각친구, 티키 · JJCP
 
 npm workspaces 기반의 Vite 웹 + Expo React Native WebView 모노레포입니다.
-시작 안내부터 학습·책장·성장 리포트·보호자 관리까지 체험할 수 있고,
-첫 탐구(그림자)는 자람마을 백엔드(`Think-Forest-Backend`)의 실제 OpenAI 사고력 엔진과 연결됩니다.
+기본 화면은 로컬 백엔드의 `/api/v1`을 사용해 로그인·대화·활동·책장·단어·공유·보호자 관리를 연결합니다.
+화면별 실제 호출 목록과 외부 서비스가 필요한 항목은 [화면별 API 연결 현황](../docs/SCREEN_API_REVIEW.md)을 확인합니다.
+
+## 현재 연결 상태 (2026-09-18)
+
+- 기본 데이터는 서버 DB에 저장합니다. 목데이터는 로그인 화면의 예시 둘러보기로 구분합니다.
+- 인증 쿠키 복원, 접근 토큰 갱신, 계정별 조회 캐시, 수정 버전 충돌·오류·재시도를 처리합니다.
+- 음성 파일 인식·소켓 자막·메시지 읽기는 API에 연결했으며 실제 사용에는 서버의 공급자 키와 권한이 필요합니다.
+- 로컬 보호자 테스트 확인은 `/profile`, 공유 승인·권한·알림 설정도 같은 화면에서 이용합니다.
+- 책 편집·단어 퀴즈·주제 분류·상담 기록·내려받기·삭제 예약은 서버와 연결되어 있습니다.
+- 운영 DB·배포에는 반영하지 않았습니다. 아래 9월 17일 진행표와 첫 탐구 v2 설명은 기존 체험 구현의 이력입니다. 현재 기본 화면은 서버 카탈로그의 활동 단계를 사용합니다.
 
 - 🌐 **웹 배포 (Netlify)**: <https://think-kids.netlify.app>
 - 🔗 **백엔드 API (Vercel)**: <https://think-forest-backend.vercel.app> (Swagger: `/docs`)
+
+## develop·main 통합
+
+- `src` 폴더 구조와 TanStack Query 인증·조회·변경 상태를 유지합니다. 로그인은 단일 `BackendProvider`를 사용하며 `/login`에서 복귀 주소와 첫인사 이동을 처리합니다.
+- 첫인사 후 원래 주제와 대화 주소로 돌아오고, 완료된 대화는 저장된 이야기 API로 내용을 다시 불러옵니다. 예시 화면의 로컬 프로필은 서버 프로필과 별도로 유지합니다.
+- 편지 배달 미션은 예시 둘러보기의 실험실에서 이용합니다. `/path/teach`, `/path/react` 요청도 TanStack Query로 관리합니다.
+- `api/v1`의 타입·요청 함수·도우미와 계약 테스트를 통합했습니다. 기본 화면은 기존 Query 훅을 통해 요청합니다.
+- 백엔드 develop의 보호자 아래 여러 아이 모델로 전체 기본 화면을 전환하는 작업은 별도 과제입니다. 기존 로컬 DB의 스키마 전환 여부는 백엔드 `INTEGRATION_NOTES.md`를 확인합니다.
 
 ## 지금까지 진행한 내용 (2026-09-17 기준)
 
@@ -35,7 +54,12 @@ packages/
     api/               # HTTP 클라이언트, 백엔드 계약 타입·요청 함수(inquiry.ts 포함)
     components/        # @emotion/native 공통 UI
     hooks/             # TanStack Query 훅(useShadowMission 등)
-    features/village/  # 우리 아이 생각친구, 티키 화면, UI, 목데이터, 학습 상태 로직
+    screens/           # 화면
+    components/        # 공통 UI와 화면 구성 요소
+    data/              # 체험 데이터
+    lib/               # 학습 규칙과 로컬 저장
+    types/             # 도메인 타입
+    navigation/        # API 화면 라우팅
     native/            # WebView 셸, 로딩/오류 처리, Android 뒤로 가기
     providers/         # ThemeProvider, QueryClientProvider, ApiClientProvider
     screens/           # 실제 화면
@@ -57,9 +81,9 @@ legacy/                # Git, 린트, 포맷 대상에서 제외
 
 Node.js 22.13 이상 및 npm 10 이상을 사용합니다. 의존성 잠금 파일을 포함합니다.
 
-### 1. 웹 실행 (실제 배포 백엔드 바로 연동)
+### 1. 웹 실행 (로컬 백엔드 연결)
 
-별도로 백엔드를 켜지 않아도, Vite 개발 서버가 배포된 Vercel 백엔드(`https://think-forest-backend.vercel.app`)와 프록시 연결되어 실제 AI와 통신합니다.
+백엔드를 8000 포트에서 실행합니다. `apps/web/.env`의 `VITE_API_BASE_URL`을 비워 두면 Vite가 `/api/v1` 요청을 `127.0.0.1:8000`으로 전달합니다. 개발·빌드 모두 운영 서버에 자동 연결하지 않습니다.
 
 ```sh
 npm install
@@ -68,17 +92,19 @@ npm run dev
 
 웹 개발 서버: <http://127.0.0.1:5173>
 
-- 로컬 백엔드를 직접 띄워 연결하려면 `VITE_API_BASE_URL=http://127.0.0.1:8010 npm run dev`로 실행합니다.
-- 같은 컴퓨터에서 다른 개발 서버가 `localhost:5173`을 쓰고 있으면 `127.0.0.1:5173`으로 엽니다.
+- 로컬 테스트 로그인 버튼은 `VITE_DEV_LOGIN=true`일 때 표시합니다(백엔드 `AUTH_DEV_LOGIN=true` 필요). `apps/web/.env.example`을 참고하세요.
+- 개발 프록시 대상은 `VITE_DEV_API_TARGET`으로 바꿀 수 있으며, 기본값은 `http://127.0.0.1:8000`입니다.
+- 다른 백엔드를 쓸 경우에만 `VITE_API_BASE_URL`을 명시합니다. 별도 출처에서는 인증 쿠키·CORS 설정도 맞아야 합니다.
+- 5173 포트를 다른 프로젝트가 사용하면 `npm run dev --workspace @jjcp/web -- --port 5175`처럼 별도 포트를 지정합니다.
 
-### 2. (선택) 로컬 백엔드 실행
+### 2. 로컬 백엔드 실행
 
-로컬 백엔드 코드를 직접 수정하며 확인할 때만 실행합니다.
+기본 화면의 저장·조회에 필요합니다. DB·환경변수 준비는 [로컬 SQLite 안내](../docs/LOCAL_SQLITE.md)를 확인합니다.
 
 ```sh
-# Think-Forest-Backend 에서
+# backend 폴더에서 (Windows는 .venv\Scripts\Activate.ps1)
 source .venv/bin/activate
-uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload --no-access-log
 ```
 
 ### 3. 첫 탐구 해 보기
@@ -231,7 +257,7 @@ AI는 답을 주지 않고, 아이가 생각해야 풀리는 상황을 만듭니
 
 ## 목데이터와 저장
 
-`features/village/data/catalog.ts`에 활동 10개, `data/mock.ts`에 예시 기록 9개가 있습니다.
+`data/catalog.ts`에 활동 10개, `data/mock.ts`에 예시 기록 9개가 있습니다.
 예시 기록은 화면에 표시하고 직접 작성한 기록과 별도로 필터링합니다. 예시 기록은
 자동 난이도 조정과 직접 완료 횟수에 포함하지 않습니다.
 

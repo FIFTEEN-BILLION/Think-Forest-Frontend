@@ -1,6 +1,8 @@
 @import 'pretendard/dist/web/variable/pretendardvariable.css';
 @import './village.css';
 @import './inquiry.css';
+@import './home.css';
+@import './server.css';
 
 main:focus {
   outline: none;

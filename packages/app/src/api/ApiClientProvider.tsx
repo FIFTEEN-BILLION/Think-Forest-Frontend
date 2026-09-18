@@ -1,15 +1,25 @@
 import { createContext, useContext, useMemo } from 'react';
 import type { PropsWithChildren } from 'react';
-import { createApiClient } from './client';
+import { createApiClient, resolveApiUrl } from './client';
 import type { ApiRequest } from './client';
 
 // 백엔드 주소는 앱 패키지가 아니라 호스트(웹 진입점)가 주입한다.
 // 그래야 @jjcp/app 이 Vite 환경변수에 묶이지 않는다.
 const ApiClientContext = createContext<ApiRequest | null>(null);
+const ApiBaseContext = createContext('');
 
 export function ApiClientProvider({ baseUrl, children }: PropsWithChildren<{ baseUrl: string }>) {
   const request = useMemo(() => createApiClient(baseUrl), [baseUrl]);
-  return <ApiClientContext.Provider value={request}>{children}</ApiClientContext.Provider>;
+  return (
+    <ApiBaseContext.Provider value={baseUrl}>
+      <ApiClientContext.Provider value={request}>{children}</ApiClientContext.Provider>
+    </ApiBaseContext.Provider>
+  );
+}
+
+export function useApiUrl() {
+  const base = useContext(ApiBaseContext);
+  return (path: string) => resolveApiUrl(base, path);
 }
 
 export function useApiClient(): ApiRequest {

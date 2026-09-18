@@ -23,8 +23,8 @@ function load(path) {
 }
 const { V1Error } = load(resolve(root, 'api/v1/client.ts'));
 const { stepMissingReasons } = load(resolve(root, 'api/v1/endpoints.ts'));
-const sync = load(resolve(root, 'features/village/components/ActivitySync.ts'));
-const catalog = load(resolve(root, 'features/village/components/ActivityCatalog.ts'));
+const sync = load(resolve(root, 'components/ActivitySync.ts'));
+const catalog = load(resolve(root, 'components/ActivityCatalog.ts'));
 
 // ---------- 서버가 알려 준 단계 조건 ----------
 

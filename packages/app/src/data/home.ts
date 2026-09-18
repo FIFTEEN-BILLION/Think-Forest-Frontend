@@ -1,0 +1,66 @@
+// 홈 체험용 추천 콘텐츠. 실제로 열 수 있는 대화·활동에 연결한다.
+export const HOME_CATEGORIES = ['추천', '과학', '생각', '마음'] as const;
+export type HomeCategory = (typeof HOME_CATEGORIES)[number];
+
+export const HOME_TOPICS = [
+  {
+    id: 'ice-cup',
+    category: '과학',
+    emoji: '🧊',
+    title: '컵 밖의 물은 어디서 왔을까?',
+    description: '차가운 컵에 맺힌 물방울의 비밀을 찾아봐.',
+    invitation: '내 생각 이야기하기',
+    to: '/talk',
+    color: 'mint',
+  },
+  {
+    id: 'honey',
+    category: '생각',
+    emoji: '🍯',
+    title: '꿀단지는 누가 가져갔을까?',
+    description: '작은 발자국을 따라 숨은 단서를 찾아봐.',
+    invitation: '이야기 속 단서 찾기',
+    to: '/adventures/forest/honey',
+    color: 'lavender',
+  },
+  {
+    id: 'kindness',
+    category: '마음',
+    emoji: '🌷',
+    title: '친구에게 어떤 말을 건넬까?',
+    description: '서로 다른 마음을 가진 친구들을 만나봐.',
+    invitation: '친구 마음 생각하기',
+    to: '/adventures/theater/kindness',
+    color: 'sky',
+  },
+  {
+    id: 'shadow',
+    category: '과학',
+    emoji: '🔦',
+    title: '그림자는 언제 길어질까?',
+    description: '빛을 움직여 그림자가 어떻게 바뀌는지 살펴봐.',
+    invitation: '직접 바꾸고 관찰하기',
+    to: '/adventures/lab/shadow',
+    color: 'sky',
+  },
+  {
+    id: 'seed',
+    category: '생각',
+    emoji: '🌱',
+    title: '왜 이 화분에만 싹이 났을까?',
+    description: '두 화분을 비교하면 새로운 생각이 떠오를 거야.',
+    invitation: '다른 점 찾아보기',
+    to: '/adventures/forest/seed',
+    color: 'mint',
+  },
+  {
+    id: 'courage',
+    category: '마음',
+    emoji: '🎵',
+    title: '처음이라 떨릴 땐 어떻게 할까?',
+    description: '작은 용기가 필요한 친구와 함께해 봐.',
+    invitation: '용기를 주는 말 찾기',
+    to: '/adventures/theater/courage',
+    color: 'lavender',
+  },
+] as const;

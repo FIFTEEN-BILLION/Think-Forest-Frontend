@@ -8,14 +8,14 @@ import { router } from './router';
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element is missing.');
 
-// 자람마을 백엔드 주소. 환경변수 우선, 프로덕션은 배포된 Vercel 백엔드, 로컬 개발은 Vite 프록시(/api).
-const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.PROD ? 'https://think-forest-backend.vercel.app' : '/api');
+// 로컬 빌드도 같은 서버를 사용한다. 별도 배포 주소는 환경변수로 명시한다.
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || '/api';
 
 // JJCP API v1 은 같은 출처 /api/v1 (개발: Vite 프록시, 배포: Netlify 프록시)로 부른다.
-// 개발용 로그인 버튼은 호스트가 켤 때만 보인다.
-const devLogin = import.meta.env.VITE_DEV_LOGIN === 'true';
+// 개발 localhost에서는 기본 표시하며 배포 빌드는 명시적으로 켜야 한다.
+const devLogin =
+  import.meta.env.VITE_DEV_LOGIN === 'true' ||
+  (import.meta.env.DEV && import.meta.env.VITE_DEV_LOGIN !== 'false');
 
 createRoot(root).render(
   <StrictMode>

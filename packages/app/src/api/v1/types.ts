@@ -541,3 +541,84 @@ export interface ShareRequestResponse {
   shareRequest: ShareRequest;
   publicStory?: PublicStory | null;
 }
+
+// --- F4 음성·알림 ---
+// 명세 20절(음성 입력과 읽어주기), 21절(알림과 기기). 백엔드 `app/v1/routers/{speech_v1,notifications}.py` 와 맞춘다.
+
+export interface SpeechAudioFormat {
+  encoding: 'PCM_S16LE';
+  sampleRate: 16000;
+  channels: 1;
+}
+
+export interface SpeechStreamTicketRequest {
+  conversationId?: string;
+  questionId?: string;
+  locale?: string;
+  audio?: SpeechAudioFormat;
+}
+
+export interface SpeechStreamTicket {
+  streamId: string;
+  /** 한 번만 쓸 수 있고 약 30초 뒤 만료된다. 다시 쓰지 않는다. */
+  ticket: string;
+  webSocketUrl: string;
+  expiresAt: string;
+}
+
+/** 스트리밍이 막혔을 때 녹음 파일로 한 번 재시도한 결과. */
+export interface SpeechTranscript {
+  text: string;
+  confidence: number;
+  durationMs: number | null;
+}
+
+export interface SpeechSynthesisRequest {
+  conversationId?: string;
+  /** 티키 메시지 id. 주면 서버가 그 메시지 본문을 읽어 준다. */
+  messageId?: string;
+  text?: string;
+}
+
+export type DevicePlatform = 'IOS' | 'ANDROID' | 'WEB';
+
+export interface DeviceRequest {
+  platform: DevicePlatform;
+  pushToken: string;
+  installationId?: string;
+  appVersion?: string;
+  locale?: string;
+}
+
+export interface Device {
+  id: string;
+  platform: DevicePlatform;
+  installationId: string | null;
+  appVersion: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationSettings {
+  pushEnabled: boolean;
+  shareRequests: boolean;
+  safetyNotices: boolean;
+  activitySummary: boolean;
+  updatedAt: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationList {
+  items: NotificationItem[];
+  unreadCount: number;
+  nextCursor: string | null;
+}

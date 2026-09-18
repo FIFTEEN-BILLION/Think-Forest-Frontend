@@ -3,11 +3,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import type { V1Client } from '../api/v1/client';
-import {
-  createTopicCategory,
-  deleteTopicCategory,
-  updateTopicCategory,
-} from '../api/v1/endpoints';
+import { createTopicCategory, deleteTopicCategory, updateTopicCategory } from '../api/v1/endpoints';
 import type { TopicCategory } from '../api/v1/types';
 import { Icon } from './Icon';
 import { Button, Notice } from './ui';

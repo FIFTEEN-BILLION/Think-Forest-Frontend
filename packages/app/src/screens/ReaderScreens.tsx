@@ -3,7 +3,10 @@
  * main 라우터가 쓰던 Server* 이름을 그대로 유지한다.
  */
 export { HomeScreen as ServerHome } from './HomeScreen';
-export { LibraryScreen as ServerLibrary, RecordDetailScreen as ServerRecord } from './LibraryScreen';
+export {
+  LibraryScreen as ServerLibrary,
+  RecordDetailScreen as ServerRecord,
+} from './LibraryScreen';
 export { CompleteScreen as ServerComplete } from './LibraryScreen';
 export { CommunityScreen as ServerCommunity } from './CommunityScreen';
 export { WordsScreen as ServerWords } from './WordsScreen';

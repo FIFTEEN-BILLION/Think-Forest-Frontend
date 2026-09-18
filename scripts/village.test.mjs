@@ -7,10 +7,7 @@ import { test } from 'node:test';
 import ts from 'typescript';
 
 // Compile the actual pure domain modules in memory; no browser or added test dependency.
-const root = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../packages/app/src/features/village',
-);
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../packages/app/src');
 const cache = new Map();
 function load(path) {
   if (cache.has(path)) return cache.get(path).exports;
@@ -342,4 +339,28 @@ test('return navigation only permits existing internal destinations', () => {
   assert.equal(safeNext('/adventures/forest/missing'), '/');
   assert.equal(safeNext('/adventures/forest/honey'), '/adventures/forest/honey');
   assert.equal(safeNext('/session/lab'), '/session/lab');
+});
+
+test('first-talk completion state (onboarding step 3 + server profile) survives a reload', () => {
+  const data = initialData();
+  const done = {
+    ...data,
+    profile: {
+      name: '별',
+      grade: '초등학교 2학년',
+      interests: ['공룡', '큰 이빨'],
+      goal: '질문하는 힘',
+    },
+    consent: {
+      ...data.consent,
+      done: true,
+      guardian: '보호자 계정과 연결',
+      noticeAt: new Date().toISOString(),
+    },
+    onboarding: { ...data.onboarding, step: 3, acknowledged: true, childPolicy: true },
+  };
+  assert.equal(storage.decode(JSON.stringify(done)).profile.name, '별');
+  assert.throws(() =>
+    storage.decode(JSON.stringify({ ...done, onboarding: { ...done.onboarding, step: 4 } })),
+  );
 });

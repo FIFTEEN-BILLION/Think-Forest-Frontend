@@ -6,3 +6,4 @@ export * from './endpoints';
 export * from './inquiry';
 export type * from './types';
 export * from './path';
+export * as v1 from './v1';

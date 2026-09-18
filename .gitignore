@@ -15,3 +15,4 @@ legacy/
 docs/
 apps/native/android/
 apps/native/ios/
+.gstack/

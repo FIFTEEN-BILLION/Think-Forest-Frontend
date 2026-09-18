@@ -7,10 +7,7 @@ import { test } from 'node:test';
 import ts from 'typescript';
 
 // Same in-memory loader as thinking.test.mjs: compile the pure domain modules only.
-const root = resolve(
-  dirname(fileURLToPath(import.meta.url)),
-  '../packages/app/src/features/village',
-);
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../packages/app/src');
 const cache = new Map();
 function load(path) {
   if (cache.has(path)) return cache.get(path).exports;

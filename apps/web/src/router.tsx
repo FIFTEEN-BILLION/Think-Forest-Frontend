@@ -1,11 +1,11 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { HomeScreen, NotFoundScreen, VillageRoot } from '@jjcp/app/screens';
 
-const parent = () => import('@jjcp/app/village/ParentScreen');
-const library = () => import('@jjcp/app/village/LibraryScreen');
-const experience = () => import('@jjcp/app/village/ExperienceScreen');
+const parent = () => import('@jjcp/app/screens/ParentScreen');
+const library = () => import('@jjcp/app/screens/LibraryScreen');
+const experience = () => import('@jjcp/app/screens/ExperienceScreen');
 const adventures = async () => ({
-  Component: (await import('@jjcp/app/village/AdventureScreen')).AdventureScreen,
+  Component: (await import('@jjcp/app/screens/AdventureScreen')).AdventureScreen,
 });
 
 export const router = createBrowserRouter([
@@ -26,25 +26,25 @@ export const router = createBrowserRouter([
       {
         path: 'talk',
         lazy: async () => ({
-          Component: (await import('@jjcp/app/village/ConversationScreen')).ConversationScreen,
+          Component: (await import('@jjcp/app/screens/ConversationScreen')).ConversationScreen,
         }),
       },
       {
         path: 'first-talk',
         lazy: async () => ({
-          Component: (await import('@jjcp/app/village/FirstTalkScreen')).FirstTalkScreen,
+          Component: (await import('@jjcp/app/screens/FirstTalkScreen')).FirstTalkScreen,
         }),
       },
       {
         path: 'words',
         lazy: async () => ({
-          Component: (await import('@jjcp/app/village/WordsScreen')).WordsScreen,
+          Component: (await import('@jjcp/app/screens/WordsScreen')).WordsScreen,
         }),
       },
       {
         path: 'community',
         lazy: async () => ({
-          Component: (await import('@jjcp/app/village/CommunityScreen')).CommunityScreen,
+          Component: (await import('@jjcp/app/screens/CommunityScreen')).CommunityScreen,
         }),
       },
       {
@@ -62,7 +62,7 @@ export const router = createBrowserRouter([
       {
         path: 'session/:track',
         lazy: async () => ({
-          Component: (await import('@jjcp/app/village/SessionScreen')).SessionScreen,
+          Component: (await import('@jjcp/app/screens/SessionScreen')).SessionScreen,
         }),
       },
       { path: 'complete/:id', lazy: async () => ({ Component: (await library()).CompleteScreen }) },
@@ -74,7 +74,7 @@ export const router = createBrowserRouter([
       {
         path: 'report',
         lazy: async () => ({
-          Component: (await import('@jjcp/app/village/ReportScreen')).ReportScreen,
+          Component: (await import('@jjcp/app/screens/ReportScreen')).ReportScreen,
         }),
       },
       {

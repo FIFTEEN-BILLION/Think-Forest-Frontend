@@ -8,10 +8,8 @@ import { router } from './router';
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element is missing.');
 
-// 자람마을 백엔드 주소. 환경변수 우선, 프로덕션은 배포된 Vercel 백엔드, 로컬 개발은 Vite 프록시(/api).
-const apiBaseUrl =
-  import.meta.env.VITE_API_BASE_URL ??
-  (import.meta.env.PROD ? 'https://think-forest-backend.vercel.app' : '/api');
+// 로컬 빌드도 같은 서버를 사용한다. 별도 배포 주소는 환경변수로 명시한다.
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim() || '/api';
 
 createRoot(root).render(
   <StrictMode>

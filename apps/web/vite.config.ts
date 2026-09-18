@@ -11,8 +11,13 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     proxy: {
+      '/api/v1': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        ws: true,
+      },
       '/api': {
-        target: 'https://think-forest-backend.vercel.app',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

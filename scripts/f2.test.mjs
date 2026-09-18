@@ -89,6 +89,21 @@ test('isVersionConflict·conflictVersion 은 409 충돌만 알아본다', () => 
   assert.equal(f2.conflictVersion(new V1Error(409, 'VERSION_CONFLICT', 'x')), null);
 });
 
+test('ifMatch 는 명세 27절대로 따옴표를 두른 version 헤더를 만든다', () => {
+  assert.deepEqual(f2.ifMatch(1), { 'If-Match': '"1"' });
+  assert.deepEqual(f2.ifMatch(12), { 'If-Match': '"12"' });
+});
+
+test('existingShareRequestId 는 이미 보낸 요청의 id 만 꺼낸다', () => {
+  const already = new V1Error(409, 'SHARE_ALREADY_REQUESTED', '이미 보낸 공유 요청이 있어요.', {
+    shareRequestId: 'shr_1',
+  });
+  assert.equal(f2.existingShareRequestId(already), 'shr_1');
+  assert.equal(f2.existingShareRequestId(new V1Error(409, 'VERSION_CONFLICT', 'x', {})), null);
+  assert.equal(f2.existingShareRequestId(new V1Error(409, 'SHARE_ALREADY_REQUESTED', 'x')), null);
+  assert.equal(f2.existingShareRequestId(new Error('x')), null);
+});
+
 test('isServerStoryId 는 sty_ 로 시작하는 서버 이야기만 고른다', () => {
   assert.equal(f2.isServerStoryId('sty_abc'), true);
   assert.equal(f2.isServerStoryId('rec_abc'), false);

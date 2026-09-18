@@ -255,6 +255,578 @@ export interface HomeResponse {
   weeklyActivity: { conversationDays: number; completedStories: number };
 }
 
+// --- F2 책장·단어·공유 ---
+// API_SPEC_V2.md 12·13·14·15·28절. 모양은 실행 중인 서버(`/openapi.json`)로 확인했다.
+
+export type StoryCategory =
+  | 'SCIENCE'
+  | 'MATH'
+  | 'HISTORY'
+  | 'THINKING'
+  | 'DAILY_LIFE'
+  | 'NATURE'
+  | 'FEELINGS'
+  | 'IMAGINATION';
+
+/** GET /stories 목록 항목. 본문(body)은 상세에만 있다. */
+export interface StorySummary {
+  id: string;
+  title: string;
+  summary: string;
+  category: string;
+  favorite: boolean;
+  version: number;
+  sourceConversationId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 서버 이야기 전문. 명세 12절 + 대화 완료 응답과 같은 모양. */
+export interface StoryFull extends StorySummary {
+  body: string;
+  thoughtJourney: ThoughtJourney;
+  topic: { id: string | null; title: string; category: string };
+}
+
+export interface WordUsed {
+  id: string;
+  word: string;
+  meaning: string;
+  status: WordStatus;
+}
+
+export interface SourceConversation {
+  conversationId: string;
+  topic: { id: string | null; title: string; category: string };
+  status: string;
+  messageCount: number;
+  startedAt: string;
+  completedAt: string | null;
+}
+
+/** GET /stories/{id} */
+export interface StoryDetail {
+  story: StoryFull;
+  wordsUsed: WordUsed[];
+  sourceConversation: SourceConversation | null;
+}
+
+/** PATCH /stories/{id}. edited=false 면 바뀐 내용이 없어 버전이 그대로다. */
+export interface StoryEdited {
+  story: StoryFull;
+  edited: boolean;
+}
+
+export interface StoryPatchRequest {
+  title?: string;
+  summary?: string;
+  body?: string;
+  version?: number;
+}
+
+/** PUT·DELETE /stories/{id}/favorite */
+export interface FavoriteResponse {
+  story: { id: string; favorite: boolean; version: number; updatedAt: string };
+}
+
+export interface StoryListQuery {
+  query?: string;
+  category?: string;
+  favorite?: boolean;
+  from?: string;
+  to?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+// ---------- 이야기책 (28절) ----------
+
+export type BookStatus = 'DRAFT' | 'COMPLETED';
+
+export interface BookCover {
+  theme?: string | null;
+  emoji?: string | null;
+}
+
+export interface BookSummary {
+  id: string;
+  title: string;
+  introduction: string;
+  cover: BookCover | null;
+  status: BookStatus;
+  storyCount: number;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+}
+
+export interface BookDetail extends BookSummary {
+  introductionSource?: 'ai' | 'fallback' | null;
+  stories: StorySummary[];
+}
+
+export interface BookResponse {
+  book: BookDetail;
+}
+
+export interface BookCreateRequest {
+  title: string;
+  storyIds?: string[];
+  generateIntroduction?: boolean;
+  cover?: BookCover | null;
+}
+
+export interface BookPatchRequest {
+  title?: string;
+  introduction?: string;
+  cover?: BookCover | null;
+  /** 순서 바꾸기: 수록 이야기 전체를 원하는 차례로 보낸다. */
+  storyIds?: string[];
+  version?: number;
+}
+
+// ---------- 단어 보관함 (13절) ----------
+
+export type WordStatus = 'NEW' | 'PRACTICING' | 'FAMILIAR';
+export type WordQuizMode = 'MEANING_TO_WORD' | 'WORD_TO_MEANING' | 'FILL_IN_BLANK';
+
+export interface WordbookEntry {
+  id: string;
+  word: string;
+  reading: string;
+  meaning: string;
+  example: string;
+  mySentence: string | null;
+  status: WordStatus;
+  source: { conversationId: string | null; messageId: string | null };
+  meaningSource: 'ai' | 'fallback';
+  sourceSentence: string;
+  lastReviewedAt: string | null;
+  nextReviewAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 점수가 아니라 상태 개수다. 화면에서도 점수처럼 보이지 않게 쓴다. */
+export interface WordbookSummary {
+  total: number;
+  familiar: number;
+  practicing: number;
+  new: number;
+  newThisWeek: number;
+  dueForReview: number;
+}
+
+export interface WordbookList {
+  summary: WordbookSummary;
+  items: WordbookEntry[];
+  nextCursor: string | null;
+}
+
+export interface WordbookEntryResponse {
+  entry: WordbookEntry;
+}
+
+export interface WordQuizQuestion {
+  id: string;
+  index: number;
+  prompt: string;
+  options: ChoiceOption[];
+  answered: boolean;
+}
+
+/** POST /word-quizzes 응답은 감싸는 키 없이 퀴즈 자체를 준다(서버 확인). */
+export interface WordQuiz {
+  id: string;
+  mode: WordQuizMode;
+  status: 'IN_PROGRESS' | 'COMPLETED';
+  questionCount: number;
+  answeredCount: number;
+  questions: WordQuizQuestion[];
+  createdAt: string;
+  completedAt: string | null;
+}
+
+export interface WordQuizAnswerResponse {
+  result: { questionId: string; correct: boolean; correctOptionId: string };
+  entry: WordbookEntry;
+  quiz: {
+    id: string;
+    status: 'IN_PROGRESS' | 'COMPLETED';
+    questionCount: number;
+    answeredCount: number;
+  };
+}
+
+// ---------- 친구들의 이야기 (14절) ----------
+
+export type RecommendationFilter = 'SIMILAR_AGE' | 'SAME_CATEGORY' | 'POPULAR' | 'NEW';
+export type ReportReason =
+  'UNCOMFORTABLE_CONTENT' | 'SCARY' | 'PERSONAL_INFO' | 'COPIED' | 'MEAN_WORDS' | 'OTHER';
+
+/** 작성자 표시는 서버가 준 것만 쓴다. 실명·학교는 응답에 없다. */
+export interface PublicAuthor {
+  displayName: string;
+  ageBand: string;
+}
+
+export interface PublicStory {
+  id: string;
+  title: string;
+  excerpt: string;
+  author: PublicAuthor;
+  category: string;
+  recommendationCount: number;
+  recommendedByMe: boolean;
+  recommendationReason: string;
+  guardianApproved?: boolean;
+  publishedAt: string;
+}
+
+export interface PublicStoryDetail extends PublicStory {
+  body: string;
+  thoughtJourney: Partial<ThoughtJourney>;
+  mine?: boolean;
+}
+
+export interface RecommendationResponse {
+  storyId: string;
+  recommendationCount: number;
+  recommendedByMe: boolean;
+}
+
+export interface CommunityReportResponse {
+  report: {
+    id: string;
+    publicStoryId: string;
+    reason: ReportReason;
+    detail: string | null;
+    status: 'OPEN' | 'RESOLVED';
+    createdAt: string;
+  };
+  storyStatus: string;
+}
+
+// ---------- 이야기 공유 (15절, 아이 쪽) ----------
+
+export type ShareAudience = 'PEERS' | 'FAMILY' | 'INVITED';
+export type ShareStatus =
+  | 'DRAFT'
+  | 'PENDING_GUARDIAN'
+  | 'APPROVED'
+  | 'PUBLISHED'
+  | 'REJECTED'
+  | 'CANCELLED'
+  | 'HIDDEN'
+  | 'REVOKED';
+
+export interface ShareRequest {
+  id: string;
+  storyId: string;
+  status: ShareStatus;
+  audience: ShareAudience;
+  hideProfile: boolean;
+  requestedBodyVersion: number;
+  confirmedBodyVersion?: number | null;
+  publicStoryId?: string | null;
+  rejectReason?: string | null;
+  pendingReason?: string | null;
+  requestedAt: string;
+  decidedAt?: string | null;
+  updatedAt: string;
+}
+
+export interface ShareRequestResponse {
+  shareRequest: ShareRequest;
+  publicStory?: PublicStory | null;
+}
+
+// --- F4 음성·알림 ---
+// 명세 20절(음성 입력과 읽어주기), 21절(알림과 기기). 백엔드 `app/v1/routers/{speech_v1,notifications}.py` 와 맞춘다.
+
+export interface SpeechAudioFormat {
+  encoding: 'PCM_S16LE';
+  sampleRate: 16000;
+  channels: 1;
+}
+
+export interface SpeechStreamTicketRequest {
+  conversationId?: string;
+  questionId?: string;
+  locale?: string;
+  audio?: SpeechAudioFormat;
+}
+
+export interface SpeechStreamTicket {
+  streamId: string;
+  /** 한 번만 쓸 수 있고 약 30초 뒤 만료된다. 다시 쓰지 않는다. */
+  ticket: string;
+  webSocketUrl: string;
+  expiresAt: string;
+}
+
+/** 스트리밍이 막혔을 때 녹음 파일로 한 번 재시도한 결과. */
+export interface SpeechTranscript {
+  text: string;
+  confidence: number;
+  durationMs: number | null;
+}
+
+export interface SpeechSynthesisRequest {
+  conversationId?: string;
+  /** 티키 메시지 id. 주면 서버가 그 메시지 본문을 읽어 준다. */
+  messageId?: string;
+  text?: string;
+}
+
+export type DevicePlatform = 'IOS' | 'ANDROID' | 'WEB';
+
+export interface DeviceRequest {
+  platform: DevicePlatform;
+  pushToken: string;
+  installationId?: string;
+  appVersion?: string;
+  locale?: string;
+}
+
+export interface Device {
+  id: string;
+  platform: DevicePlatform;
+  installationId: string | null;
+  appVersion: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NotificationSettings {
+  pushEnabled: boolean;
+  shareRequests: boolean;
+  safetyNotices: boolean;
+  activitySummary: boolean;
+  updatedAt: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  data: Record<string, unknown>;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationList {
+  items: NotificationItem[];
+  unreadCount: number;
+  nextCursor: string | null;
+}
+
+// --- F1 홈·주제·활동 ---
+// 라이브 서버(`/openapi.json`)에서 확인한 모양이다. 명세와 다른 곳은 주석으로 남긴다.
+
+/** GET /home 의 미리보기 항목. 명세 10절은 빈 배열만 보여 준다. */
+export interface HomeRecentWord {
+  word: string;
+  meaning: string;
+}
+export interface HomeCommunityStoryPreview {
+  id: string;
+  title: string;
+}
+
+/** 목록 응답의 주제. 명세 11절 예시에 없는 `hook`(한 줄 소개)을 서버가 내려준다. */
+export interface TopicListItem extends Topic {
+  hook?: string | null;
+}
+
+/** GET /topics/{id}. 대표 질문 목록이 함께 온다. */
+export interface TopicDetail extends TopicListItem {
+  questions: string[];
+}
+
+/** POST /topics 가 받는 기본 카테고리. 사용자 카테고리 id 는 받지 않는다. */
+export type TopicCategoryId =
+  | 'SCIENCE'
+  | 'MATH'
+  | 'HISTORY'
+  | 'THINKING'
+  | 'DAILY_LIFE'
+  | 'NATURE'
+  | 'FEELINGS'
+  | 'IMAGINATION';
+
+export interface TopicCreateRequest {
+  title: string;
+  category: TopicCategoryId;
+}
+
+export interface TopicSafety {
+  allowed: boolean;
+  reason: string | null;
+}
+
+export interface TopicCreateResponse {
+  topic: { id: string; title: string; category: string; source: string };
+  safety: TopicSafety;
+}
+
+export interface TopicCategory {
+  id: string;
+  name: string;
+  kind: 'DEFAULT' | 'USER';
+  order: number;
+  /** 아이콘 이름(magnifier·puzzle·castle·lightbulb·book·star). */
+  visual: string;
+  /** 기본 카테고리는 false — 수정·삭제할 수 없다. */
+  editable: boolean;
+}
+
+export interface TopicCategoryCreateRequest {
+  name: string;
+  order?: number | null;
+}
+
+export interface TopicCategoryUpdateRequest {
+  name?: string | null;
+  order?: number | null;
+}
+
+// ---------- 생각 모험 활동 ----------
+
+export type ActivityTrack = 'forest' | 'lab' | 'theater';
+
+export interface ActivityItem {
+  id: string;
+  track: ActivityTrack;
+  /** 영역 표시(사고력 · 과학 · 수학 · 역사 · 인성) */
+  area: string;
+  /** 활동이 있는 곳의 이름 */
+  place: string;
+  title: string;
+  subtitle: string;
+  level: string;
+  tags: string[];
+  description: string;
+  estimatedMinutes: number;
+  /** 글쓰기 단계에서 공백을 뺀 최소 글자 수 */
+  minCharacters: number;
+}
+
+export interface ActivityVisuals {
+  kind: string;
+  icon: string;
+  color: string;
+  items: string[];
+}
+
+export interface ActivityDetail extends ActivityItem {
+  intro: string;
+  clue: string | null;
+  steps: string[];
+  questions: string[];
+  visuals: ActivityVisuals;
+}
+
+export interface ActivityAnswer {
+  question: string;
+  text: string;
+}
+
+export interface ActivityStep {
+  index: number;
+  label: string;
+  total: number;
+  /** 이 단계가 글쓰기 단계인가 */
+  writing: boolean;
+}
+
+/** 서버가 보관하는 초안. 로컬 Draft 와 같은 모양이라 그대로 비교할 수 있다. */
+export interface ActivityDraftState {
+  text: string;
+  answers: ActivityAnswer[];
+  followup: string;
+  hints: number;
+  lab: Record<string, unknown>;
+  theater: Record<string, unknown>;
+  inquiry: Record<string, unknown> | null;
+  path: Record<string, unknown> | null;
+}
+
+/** 지금 단계에서 아직 못 채운 조건. 아이에게 그대로 보여 줄 문장이 담겨 있다. */
+export interface MissingCondition {
+  code: string;
+  message: string;
+}
+
+export type ActivitySessionStatus = 'ACTIVE' | 'COMPLETED' | 'CANCELLED';
+
+export interface ActivitySession {
+  sessionId: string;
+  activityId: string;
+  track: ActivityTrack;
+  title: string;
+  status: ActivitySessionStatus;
+  /** 자동 저장 번호. PATCH 의 clientRevision 에 그대로 넣는다. */
+  revision: number;
+  step: ActivityStep;
+  minCharacters: number;
+  draft: ActivityDraftState;
+  missing: MissingCondition[];
+  readyToComplete: boolean;
+  storyId: string | null;
+  startedAt: string;
+  updatedAt: string;
+}
+
+export type ActivityEventType =
+  | 'TEXT'
+  | 'HINT'
+  | 'TOPIC'
+  | 'KEYWORD'
+  | 'LAB_VALUE'
+  | 'OBSERVATION'
+  | 'APPROVE'
+  | 'SCENE'
+  | 'CHOICE'
+  | 'EMOTION'
+  | 'INQUIRY'
+  | 'RUN';
+
+export interface ActivityEvent {
+  type: ActivityEventType;
+  /** OBSERVATION 은 LOW_LIGHT·HIGH_LIGHT·A·B 만 받는다. */
+  field?: string | null;
+  value?: unknown;
+}
+
+export interface ActivityStartRequest {
+  activityId: string;
+  /** 마음극장 활동의 마음 키워드 */
+  keyword?: string;
+}
+
+export interface ActivityPatchRequest {
+  clientRevision: number;
+  event: ActivityEvent;
+}
+
+export interface ActivityStory {
+  id: string;
+  title: string;
+  summary: string;
+  body: string;
+  category: string;
+  answers: ActivityAnswer[];
+  createdAt: string;
+}
+
+export interface ActivityCompleteResponse {
+  session: ActivitySession;
+  story: ActivityStory;
+}
+
 // --- F3 보호자·설정·기록 ---
 // 명세 15(보호자 쪽)·16·17·18·22·23·26·29절. 실제 서버 `/openapi.json`(2026-09-18)으로 모양을 맞췄다.
 
@@ -425,50 +997,6 @@ export interface UnlinkResult {
 }
 
 // ---------- 공유 승인 (15절 보호자 쪽) ----------
-
-export type ShareStatus =
-  | 'DRAFT'
-  | 'PENDING_GUARDIAN'
-  | 'APPROVED'
-  | 'PUBLISHED'
-  | 'REJECTED'
-  | 'CANCELLED'
-  | 'HIDDEN'
-  | 'REVOKED';
-
-export interface ShareRequest {
-  id: string;
-  storyId: string;
-  status: ShareStatus;
-  audience: 'PEERS' | 'FAMILY' | 'INVITED';
-  hideProfile: boolean;
-  requestedBodyVersion: number;
-  confirmedBodyVersion?: number | null;
-  publicStoryId?: string | null;
-  rejectReason?: string | null;
-  pendingReason?: string | null;
-  requestedAt: string;
-  decidedAt?: string | null;
-  updatedAt: string;
-}
-
-export interface PublicStory {
-  id: string;
-  title: string;
-  excerpt: string;
-  author: { displayName: string; ageBand: string };
-  category: string;
-  recommendationCount: number;
-  recommendedByMe: boolean;
-  recommendationReason: string;
-  guardianApproved?: boolean;
-  publishedAt: string;
-}
-
-export interface ShareRequestResponse {
-  shareRequest: ShareRequest;
-  publicStory?: PublicStory | null;
-}
 
 /** 승인 화면에서 미리 보여 줄 본문. 보호자 연결 계정은 `/stories/{id}` 를 못 읽을 수 있다. */
 export interface StoryPreview {

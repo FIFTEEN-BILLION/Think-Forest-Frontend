@@ -259,8 +259,8 @@ export function cancelConversation(
 
 // --- F2 책장·단어·공유 ---
 // 명세 12·13·14·15·28절. 모양은 실행 중인 서버로 확인했다.
-// client.request 는 임의 헤더를 보내지 않으므로 충돌 검사는 본문 `version` 으로 한다.
-// 서버는 If-Match 와 본문 version 을 같게 취급하고, 둘 다 없으면 400 INVALID_INPUT 을 준다(확인).
+// 수정 충돌은 명세 27절대로 `If-Match` 로 검사한다. 서버는 본문 `version` 도 같게 받아 주지만
+// 둘 다 없으면 400 INVALID_INPUT 을 준다(확인). 충돌이면 409 VERSION_CONFLICT + details.currentVersion.
 
 import type {
   BookCreateRequest,
@@ -306,7 +306,10 @@ export function getStoryDetail(client: V1Client, storyId: string, signal?: Abort
   return client.request<StoryDetail>(`/stories/${id(storyId)}`, { signal });
 }
 
-/** 제목·본문 고치기. `version` 은 지금 화면에 띄운 이야기의 버전이다. */
+/** 수정 충돌 검사용 헤더. `version` 은 지금 화면에 띄운 것의 버전이다. */
+export const ifMatch = (version: number) => ({ 'If-Match': `"${version}"` });
+
+/** 제목·본문 고치기. 다른 기기가 먼저 고쳤으면 409 VERSION_CONFLICT 가 온다. */
 export function editStory(
   client: V1Client,
   storyId: string,
@@ -315,7 +318,8 @@ export function editStory(
 ) {
   return client.request<StoryEdited>(`/stories/${id(storyId)}`, {
     method: 'PATCH',
-    body: { ...patch, version },
+    body: patch,
+    headers: ifMatch(version),
   });
 }
 
@@ -536,6 +540,13 @@ export function isVersionConflict(error: unknown): boolean {
     error.status === 409 &&
     (error.code === 'VERSION_CONFLICT' || error.code === 'CONFLICT')
   );
+}
+
+/** 이미 보낸 공유 요청이 있을 때(409 SHARE_ALREADY_REQUESTED) 서버가 알려 준 요청 id. */
+export function existingShareRequestId(error: unknown): string | null {
+  if (!(error instanceof V1Error) || error.code !== 'SHARE_ALREADY_REQUESTED') return null;
+  const value = error.details?.shareRequestId;
+  return typeof value === 'string' && value ? value : null;
 }
 
 /** 충돌 응답이 알려 준 서버의 현재 버전. 없으면 null. */

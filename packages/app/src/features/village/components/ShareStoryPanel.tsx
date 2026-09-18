@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import {
   cancelShareRequest,
+  existingShareRequestId,
   getShareRequest,
   requestShare,
   SHARE_AUDIENCE,
@@ -96,6 +97,17 @@ export function ShareRequestPanel({
       apply(body.shareRequest);
       toast('보호자에게 공유 확인을 요청했어요.');
     } catch (reason) {
+      // 다른 기기에서 이미 보냈으면 서버가 그 요청 id 를 알려 준다. 오류 대신 그 상태를 보여 준다.
+      const existing = existingShareRequestId(reason);
+      if (existing) {
+        try {
+          apply((await getShareRequest(client, existing)).shareRequest);
+          toast('이미 보호자에게 보낸 이야기예요.');
+          return;
+        } catch {
+          // 상태를 못 읽으면 아래 오류 안내로 넘어간다.
+        }
+      }
       setError(libraryErrorText(reason, '공유 요청을 보내지 못했어요.'));
     } finally {
       setBusy(false);

@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef, useState } from 'react';
+import { createContext, useCallback, useContext, useRef } from 'react';
 import type { PropsWithChildren } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../api/ApiClientProvider';
@@ -14,10 +14,10 @@ interface Backend {
   me: Me | null;
   loading: boolean;
   error: string;
-  demo: boolean;
-  setDemo: (value: boolean) => void;
+  profileId: string;
+  scopeId: string;
   request: Request;
-  login: (role: 'CHILD' | 'GUARDIAN') => Promise<void>;
+  login: () => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
   invalidate: () => Promise<void>;
@@ -34,7 +34,6 @@ export function BackendProvider({
   // Credentials remain in memory, outside both the query cache and browser storage.
   const token = useRef('');
   const refresh = useRef<Promise<string> | null>(null);
-  const [demo, setDemo] = useState(false);
   const renew = useCallback(async () => {
     if (!refresh.current) {
       refresh.current = api<Token>('api/v1/auth/token/refresh', {
@@ -67,7 +66,12 @@ export function BackendProvider({
       try {
         return await perform();
       } catch (error) {
-        if (!(error instanceof ApiError) || error.status !== 401) throw error;
+        if (
+          !(error instanceof ApiError) ||
+          error.status !== 401 ||
+          error.body.includes('REAUTH_REQUIRED')
+        )
+          throw error;
         try {
           await renew();
         } catch (refreshError) {
@@ -97,16 +101,18 @@ export function BackendProvider({
     staleTime: Infinity,
   });
   const refreshMe = useCallback(async () => {
-    await cache.fetchQuery({
-      queryKey: serverKeys.me,
-      queryFn: () => request<Me>('me'),
-      staleTime: 0,
-    });
+    const previous = cache.getQueryData<Me | null>(serverKeys.me);
+    const next = await request<Me>('me');
+    const before = previous?.profiles.find((p) => p.isDefault)?.id;
+    const after = next.profiles.find((p) => p.isDefault)?.id;
+    // Cancel reads for the previous child before exposing the new profile.
+    if (previous?.user.id !== next.user.id || before !== after) await replaceAccount(cache, next);
+    else cache.setQueryData(serverKeys.me, next);
   }, [cache, request]);
   const login = useMutation({
     mutationKey: ['auth', 'login'],
-    mutationFn: async (role: 'CHILD' | 'GUARDIAN') => {
-      const key = `jjcp-device-${role.toLowerCase()}`;
+    mutationFn: async () => {
+      const key = 'jjcp-device-child';
       let deviceKey = localStorage.getItem(key);
       if (!deviceKey) {
         deviceKey = crypto.randomUUID();
@@ -116,19 +122,14 @@ export function BackendProvider({
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceKey, nickname: role === 'CHILD' ? '새싹' : '보호자' }),
+        body: JSON.stringify({ deviceKey, nickname: '새싹' }),
       });
       token.current = result.accessToken;
       const me = await request<Me>('me');
-      if (role === 'GUARDIAN' && me.user.role !== 'GUARDIAN') {
-        await request('auth/guardian/enroll', json({ intent: role }));
-        return request<Me>('me');
-      }
       return me;
     },
     onSuccess: async (me) => {
       await replaceAccount(cache, me);
-      setDemo(false);
     },
   });
   const logout = useMutation({
@@ -148,14 +149,15 @@ export function BackendProvider({
         me: account.data ?? null,
         loading: account.isPending || login.isPending || logout.isPending,
         error: failure ? errorMessage(failure) : '',
-        demo,
-        setDemo,
+        profileId:
+          account.data?.profiles.find((p) => p.isDefault)?.id ?? account.data?.profile?.id ?? '',
+        scopeId: `${account.data?.user.id ?? ''}:${account.data?.profiles.find((p) => p.isDefault)?.id ?? ''}`,
         request,
         refreshMe,
-        login: async (role) => {
+        login: async () => {
           logout.reset();
           try {
-            await login.mutateAsync(role);
+            await login.mutateAsync();
           } catch {
             /* Render mutation error. */
           }
@@ -168,7 +170,9 @@ export function BackendProvider({
           }
         },
         invalidate: () =>
-          cache.invalidateQueries({ queryKey: serverKeys.user(account.data?.user.id) }),
+          cache.invalidateQueries({
+            predicate: (q) => q.queryKey[0] === 'server' && q.queryKey[1] !== 'auth',
+          }),
       }}
     >
       {children}

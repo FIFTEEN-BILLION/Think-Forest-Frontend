@@ -1,4 +1,4 @@
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { loginErrorMessage, parseLoginParams, postLoginPath } from '../api/v1/chat';
 import { useApiUrl } from '../api/ApiClientProvider';
 import { useBackend } from '../providers/BackendProvider';
@@ -6,11 +6,9 @@ import { useBackend } from '../providers/BackendProvider';
 export function LoginScreen() {
   const backend = useBackend();
   const location = useLocation();
-  const navigate = useNavigate();
   const apiUrl = useApiUrl();
   const { returnTo, loginError } = parseLoginParams(location.search);
-  if (backend.me && !backend.demo)
-    return <Navigate replace to={postLoginPath(backend.me.user, returnTo)} />;
+  if (backend.me) return <Navigate replace to={postLoginPath(backend.me.user, returnTo)} />;
   const local = ['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname);
   const callback = `/login?returnTo=${encodeURIComponent(returnTo)}`;
   const error = backend.error || loginErrorMessage(loginError);
@@ -25,7 +23,7 @@ export function LoginScreen() {
       ) : (
         <>
           <a
-            className="btn"
+            className="btn kakao-login"
             href={apiUrl(`api/v1/auth/kakao/authorize?returnTo=${encodeURIComponent(callback)}`)}
           >
             카카오로 시작
@@ -36,26 +34,14 @@ export function LoginScreen() {
                 로컬 테스트 환경 · 실제 아동 정보 대신 가상의 정보를 입력해 주세요.
               </p>
               <div className="row wrap">
-                <button className="btn" onClick={() => void backend.login('CHILD')}>
-                  아이 테스트 계정으로 시작
-                </button>
-                <button className="btn light" onClick={() => void backend.login('GUARDIAN')}>
-                  보호자 테스트 계정으로 시작
+                <button className="btn" onClick={() => void backend.login()}>
+                  로컬 테스트 계정으로 시작
                 </button>
               </div>
             </>
           )}
         </>
       )}
-      <button
-        className="btn light"
-        onClick={() => {
-          backend.setDemo(true);
-          navigate(returnTo, { replace: true });
-        }}
-      >
-        예시 화면 둘러보기
-      </button>
     </section>
   );
 }

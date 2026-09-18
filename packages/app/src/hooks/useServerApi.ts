@@ -7,11 +7,11 @@ import { serverKeys } from '../api/serverKeys';
 export function useServerQuery<T>(path: string | null, poll = false) {
   const backend = useBackend();
   const cache = useQueryClient();
-  const queryKey = serverKeys.resource(backend.me?.user.id, path);
+  const queryKey = serverKeys.resource(backend.scopeId, path);
   const query = useQuery<T>({
     queryKey,
     queryFn: ({ signal }) => backend.request<T>(path!, { signal }),
-    enabled: !!backend.me && !!path && !backend.demo,
+    enabled: !!backend.me && !!path,
     retry: false,
     refetchInterval: poll
       ? (query) => {
@@ -31,11 +31,11 @@ export function useServerQuery<T>(path: string | null, poll = false) {
 }
 
 export function useServerCache() {
-  const { me } = useBackend();
+  const { scopeId } = useBackend();
   const cache = useQueryClient();
   return {
     set: <T>(path: string, value: T) =>
-      cache.setQueryData(serverKeys.resource(me?.user.id, path), value),
+      cache.setQueryData(serverKeys.resource(scopeId, path), value),
   };
 }
 
@@ -45,7 +45,7 @@ export function useAction({ invalidate = true }: { invalidate?: boolean } = {}) 
   const locked = useRef(false);
   const [notice, setNotice] = useState('');
   const mutation = useMutation({
-    mutationKey: [...serverKeys.user(backend.me?.user.id), 'action'],
+    mutationKey: [...serverKeys.user(backend.scopeId), 'action'],
     mutationFn: (action: () => Promise<void>) => action(),
     onSuccess: () => (invalidate ? backend.invalidate() : undefined),
   });

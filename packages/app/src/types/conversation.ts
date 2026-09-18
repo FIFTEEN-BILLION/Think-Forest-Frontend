@@ -22,5 +22,11 @@ export interface ChatSession {
   storyId?: string;
   nextCursor?: string | null;
   topic?: { title: string };
+  profileDraft?: {
+    nickname: string | null;
+    schoolOrGroup: string | null;
+    gradeOrAgeBand: string | null;
+    interests: string[];
+  };
   completion?: { story?: { id: string } };
 }

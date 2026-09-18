@@ -23,16 +23,16 @@ export function useConversation({
   const [sessionId, setSessionId] = useState(existing);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const started = useRef(false);
-  const storageKey = `jjcp-active-${backend.me?.user.id}-${prefix}-${topic}`;
+  const storageKey = `jjcp-active-${backend.scopeId}-${prefix}-${topic}`;
   const query = useServerQuery<ChatSession>(sessionId ? `${prefix}/${sessionId}` : null);
   const start = useMutation({
-    mutationKey: [...serverKeys.user(backend.me?.user.id), 'start-conversation', prefix, topic],
+    mutationKey: [...serverKeys.user(backend.scopeId), 'start-conversation', prefix, topic],
     mutationFn: async () => {
       const remembered = sessionStorage.getItem(storageKey);
       if (remembered) {
         try {
           const session = await cache.fetchQuery({
-            queryKey: serverKeys.resource(backend.me?.user.id, `${prefix}/${remembered}`),
+            queryKey: serverKeys.resource(backend.scopeId, `${prefix}/${remembered}`),
             queryFn: ({ signal }) =>
               backend.request<ChatSession>(`${prefix}/${remembered}`, { signal }),
             staleTime: 0,
@@ -49,18 +49,23 @@ export function useConversation({
     },
     onSuccess: (result) => {
       const id = result.sessionId ?? result.conversationId!;
-      cache.setQueryData(serverKeys.resource(backend.me?.user.id, `${prefix}/${id}`), result);
+      cache.setQueryData(serverKeys.resource(backend.scopeId, `${prefix}/${id}`), result);
       sessionStorage.setItem(storageKey, id);
       setSessionId(id);
     },
   });
   const { mutate } = start;
   useEffect(() => {
-    if (!existing && !started.current && backend.me?.user.role === 'CHILD') {
+    if (
+      !existing &&
+      !started.current &&
+      !!backend.me &&
+      (greeting || !backend.me.user.needsFirstGreeting)
+    ) {
       started.current = true;
       mutate();
     }
-  }, [existing, backend.me?.user.role, mutate]);
+  }, [existing, backend.me, greeting, mutate]);
   return {
     data: query.data,
     error: start.error ?? query.error,

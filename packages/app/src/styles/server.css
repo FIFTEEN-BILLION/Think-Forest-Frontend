@@ -5,7 +5,8 @@
   gap: 1rem;
   padding: 0.7rem 1rem;
   margin-bottom: 1.5rem;
-  background: var(--paper, #f5f7ef);
+  background: var(--paper-1);
+  color: var(--ink-900);
   border-radius: 12px;
   font-size: 0.85rem;
 }
@@ -49,17 +50,22 @@
   flex-direction: column;
   gap: 1rem;
   padding: 1rem 0 2rem;
+  max-height: 55dvh;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
 }
 .server-bubble {
   max-width: 88%;
-  background: var(--paper, #f5f3ea);
+  background: var(--paper-1);
+  color: var(--ink-900);
   border-radius: 20px 20px 20px 4px;
   padding: 1.1rem 1.4rem;
 }
 .server-bubble.mine {
   align-self: flex-end;
-  background: #e9f1da;
-  color: #243b28;
+  background: var(--paper-2);
+  color: var(--ink-900);
   border-radius: 20px 20px 4px 20px;
 }
 .server-bubble p {
@@ -71,21 +77,31 @@
   opacity: 0.7;
 }
 .server-composer {
-  position: sticky;
-  bottom: 1rem;
+  position: relative;
   box-shadow: 0 5px 28px #0000000d;
 }
 .server-review {
-  border-top: 1px solid #d9dfd2;
+  border-top: 1px solid var(--line);
   padding: 1.2rem 0;
 }
 .server-number {
   font-size: 2.5rem;
 }
 .server-welcome {
+  display: grid;
+  gap: 20px;
   padding: clamp(1.5rem, 5vw, 4rem);
   margin: 2rem auto;
   max-width: 800px;
+}
+.api-page .server-welcome > :where(h1, p, .btn) {
+  margin: 0;
+}
+.server-welcome > .tag {
+  justify-self: start;
+}
+.server-welcome > .row > .btn {
+  width: 100%;
 }
 .voice-input {
   display: flex;
@@ -96,7 +112,7 @@
 }
 .voice-input small {
   width: 100%;
-  color: var(--muted, #647260);
+  color: var(--ink-500);
 }
 .server-detail label,
 .server-composer label,
@@ -117,6 +133,34 @@
 .server-grid .panel {
   margin: 0;
 }
+.server-listen:disabled {
+  opacity: 1;
+  color: inherit;
+}
+.chat-warning {
+  border: 1px solid var(--coral);
+  border-radius: 12px;
+  padding: 0.75rem;
+  background: var(--coral-soft);
+  color: var(--ink-900);
+}
+.chat-warning button {
+  text-decoration: underline;
+}
+.chat-loading-dots {
+  display: inline-block;
+  animation: chat-pulse 1.2s ease-in-out infinite alternate;
+}
+@keyframes chat-pulse {
+  to {
+    opacity: 0.4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-loading-dots {
+    animation: none;
+  }
+}
 @media (max-width: 600px) {
   .server-status {
     flex-wrap: wrap;
@@ -126,5 +170,525 @@
   }
   .server-bubble {
     max-width: 96%;
+  }
+}
+
+/* API screens share the original village components and theme tokens. */
+#sidebar.sidebar {
+  overflow-y: auto;
+}
+.side-utility {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0;
+  color: var(--sidebar-nav);
+  font-size: 13px;
+}
+.topbar .profile-switcher {
+  width: auto;
+  max-width: 150px;
+  min-height: 40px;
+  padding: 6px 28px 6px 12px;
+  font-size: 15px;
+}
+.api-page {
+  min-width: 0;
+}
+.api-page > .panel,
+.api-page > section + section {
+  margin-top: 24px;
+}
+.api-page :where(form, .panel) > h2 {
+  margin-bottom: 16px;
+}
+.api-page :where(label) {
+  display: block;
+  margin: 12px 0;
+}
+.api-page label:not(.choice-control):has(> input[type='checkbox']) {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.api-page input[type='checkbox'] {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  margin: 0;
+}
+.api-page :where(.panel, .word-card) :where(textarea, input:not([type='checkbox']), select) {
+  max-width: 100%;
+}
+.api-page :where(.panel, .word-card) textarea {
+  width: 100%;
+}
+.api-page :where(.panel, .word-card) > .btn {
+  margin: 8px 8px 0 0;
+}
+.api-page .search-field {
+  margin-block: 24px;
+}
+.api-page .book-body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.api-page .book-body > p {
+  margin: 0;
+}
+.api-page .community-grid {
+  margin-block: 28px;
+}
+.home-weekly-strip {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 32px;
+  padding: 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--paper-1);
+}
+.home-weekly-strip > .icon {
+  color: var(--teal);
+  width: 32px;
+  height: 32px;
+}
+.home-weekly-strip > a {
+  margin-left: auto;
+}
+.home-weekly-strip p {
+  color: var(--ink-500);
+}
+.server-chat .first-talk-stage {
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 28px;
+}
+.server-chat .first-buddy > .session-progress {
+  width: 100%;
+  margin-top: 24px;
+}
+.server-chat .server-thread {
+  display: flex;
+  min-height: 280px;
+  max-height: 55dvh;
+  padding: 24px;
+  background: var(--paper-0);
+}
+.server-chat .server-bubble {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 100%;
+  background: none;
+  border-radius: 0;
+  padding: 0;
+}
+.server-chat .server-bubble.mine {
+  flex-direction: row-reverse;
+}
+.server-chat .server-bubble-content {
+  min-width: 0;
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 7px 18px 18px 18px;
+  background: var(--paper-1);
+  color: var(--ink-900);
+}
+.server-chat .mine .server-bubble-content {
+  border-radius: 18px 7px 18px 18px;
+  background: var(--teal-soft);
+}
+.server-chat .server-bubble-content > .btn {
+  padding: 6px 10px;
+  min-height: 36px;
+  margin: 6px 6px 0 0;
+  font-size: 13px;
+}
+.server-chat .server-composer {
+  display: block;
+  min-height: 0;
+  padding: 24px;
+  background: var(--paper-1);
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  margin: 0;
+}
+.server-chat .server-composer .row {
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.server-chat .first-chat {
+  min-width: 0;
+}
+.server-chat .message-avatar {
+  flex-shrink: 0;
+}
+@media (max-width: 1100px) {
+  .server-chat .first-talk-stage {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .server-chat .first-buddy {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  .topbar .profile-switcher {
+    max-width: 92px;
+    min-height: 36px;
+    font-size: 13px;
+  }
+  .home-weekly-strip {
+    flex-wrap: wrap;
+    padding: 20px;
+  }
+  .home-weekly-strip > a {
+    margin-left: 0;
+  }
+  .server-chat .server-thread {
+    padding: 14px;
+  }
+  .server-chat .server-bubble {
+    gap: 7px;
+  }
+  .server-chat .server-bubble-content {
+    padding: 12px;
+  }
+  .server-chat .server-composer {
+    padding: 16px;
+  }
+  .server-chat .first-talk-head > div {
+    min-width: 0;
+  }
+  .server-chat .first-talk-head > .tag {
+    display: none;
+  }
+  .server-chat .first-talk-head {
+    grid-template-columns: auto 1fr;
+  }
+}
+
+.progress-chart {
+  margin: 24px 0;
+}
+.progress-chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Shared selections: keep native keyboard/form behavior behind a themed control. */
+.api-page .choice-control {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  max-width: 100%;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-1);
+  color: var(--ink-900);
+  text-align: left;
+  cursor: pointer;
+}
+.api-page .choice-control > input[type='checkbox'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  margin: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+}
+.choice-control-mark {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--ink-500);
+  border-radius: 7px;
+  background: var(--paper-1);
+  color: var(--green-on);
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.choice-control-mark .icon {
+  width: 16px;
+  height: 16px;
+  opacity: 0;
+  stroke-width: 3;
+}
+.choice-control input:checked + .choice-control-mark {
+  background: var(--green);
+  border-color: var(--green);
+}
+.choice-control input:checked + .choice-control-mark .icon {
+  opacity: 1;
+}
+.choice-control-copy {
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+.choice-control-copy small {
+  display: block;
+  margin-top: 5px;
+  color: var(--ink-500);
+  font-size: 13px;
+  font-weight: 400;
+}
+.api-page .choice-control:has(input:focus-visible) {
+  outline: 3px solid var(--teal);
+  outline-offset: 3px;
+}
+.api-page .choice-control:has(input:disabled) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.api-page .choice-control--chip {
+  width: fit-content;
+  border-radius: 999px;
+  padding-inline: 16px;
+}
+.api-page .choice-control--chip:has(input:checked) {
+  background: var(--teal-soft);
+  border-color: var(--teal);
+}
+.api-page .choice-control--switch {
+  grid-template-columns: minmax(0, 1fr) 44px;
+  padding: 14px 16px;
+}
+.choice-control--switch .choice-control-copy {
+  grid-column: 1;
+  grid-row: 1;
+}
+.choice-control--switch .choice-control-mark {
+  grid-column: 2;
+  grid-row: 1;
+  width: 44px;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--ink-500);
+}
+.choice-control--switch .choice-control-mark::after {
+  content: '';
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--paper-1);
+  transform: translateX(-9px);
+  transition: transform 0.15s;
+}
+.choice-control--switch input:checked + .choice-control-mark::after {
+  background: var(--green-on);
+  transform: translateX(9px);
+}
+@media (forced-colors: active) {
+  .choice-control-mark {
+    forced-color-adjust: none;
+    background: Canvas;
+    border-color: ButtonText;
+  }
+  .choice-control input:checked + .choice-control-mark {
+    background: Highlight;
+    border-color: Highlight;
+    color: HighlightText;
+  }
+  .choice-control--switch .choice-control-mark::after {
+    background: ButtonText;
+  }
+  .choice-control--switch input:checked + .choice-control-mark::after {
+    background: HighlightText;
+  }
+}
+
+.api-page :where(.panel, .server-detail, .book, .word-card, .community-card, form) {
+  min-width: 0;
+}
+.api-page :where(h1, h2, h3, p, code, a, summary) {
+  overflow-wrap: anywhere;
+}
+.api-page .row {
+  flex-wrap: wrap;
+}
+.api-page .pagination {
+  margin-block: 24px;
+}
+.api-page .btn,
+.api-page .chip {
+  max-width: 100%;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.api-page .btn > .icon {
+  flex-shrink: 0;
+}
+.api-page .panel :where(input, select, textarea) {
+  min-width: 0;
+}
+.api-page .panel label > :where(input, select, textarea) {
+  margin-right: 0;
+}
+.api-page .library-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.api-page .library-toolbar .search-field {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.api-page .library-toolbar .choice-control {
+  flex: none;
+  margin: 0;
+}
+.api-page .book-body .choice-control {
+  width: 100%;
+}
+.api-page .book-cover {
+  display: block;
+  height: auto;
+  min-height: 220px;
+  padding: 24px 24px 76px;
+}
+.api-page .book-cover h3 {
+  max-width: 100%;
+}
+.api-page .server-prose {
+  overflow-wrap: anywhere;
+}
+.api-page .panel > details {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+.api-page .panel > details > summary {
+  cursor: pointer;
+  line-height: 1.7;
+}
+.api-page .path-cell:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.server-chat .first-talk-head > div {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+  text-align: left;
+}
+.server-chat .first-talk-head small {
+  font-weight: 400;
+  line-height: 1.6;
+  color: var(--ink-500);
+}
+.server-chat .voice-input .choice-control {
+  width: auto;
+  min-width: 210px;
+  margin: 0;
+  padding: 10px 12px;
+}
+.api-page .server-bubble-content {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 700px) {
+  .shell .topbar > .row {
+    min-width: 0;
+    gap: 8px;
+  }
+  .shell .topbar .breadcrumb {
+    min-width: 0;
+  }
+  .shell .topbar .breadcrumb strong {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .shell .topbar .top-actions,
+  .shell .topbar .icon-btn {
+    flex-shrink: 0;
+  }
+  .shell .topbar {
+    gap: 10px;
+  }
+  .api-page .btn {
+    padding: 12px 16px;
+    min-height: 48px;
+    font-size: 15px;
+  }
+  .api-page .chip {
+    min-height: 44px;
+  }
+  .api-page .panel > .btn {
+    margin-right: 0;
+  }
+  .api-page .panel > .btn + .btn {
+    margin-left: 8px;
+  }
+  .server-chat .first-talk-head {
+    grid-template-columns: 44px minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+  }
+  .server-chat .first-talk-head > .tag {
+    display: none;
+  }
+  .server-chat .first-talk-head strong {
+    font-size: 18px;
+    line-height: 1.5;
+  }
+  .server-chat .server-thread {
+    padding: 12px;
+    min-height: 240px;
+    max-height: 48dvh;
+  }
+  .server-chat .message-avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 16px;
+  }
+  .server-chat .server-bubble-content > .btn {
+    padding: 8px;
+    min-height: 44px;
+    font-size: 12px;
+  }
+  .server-chat .server-composer textarea {
+    min-height: 110px;
+  }
+  .server-chat .voice-input > .btn,
+  .server-chat .voice-input .choice-control,
+  .server-chat .server-composer > .btn {
+    width: 100%;
+    min-width: 0;
+  }
+  .api-page .server-detail > .row > .btn {
+    flex: 1 1 180px;
+  }
+  .api-page :where(input:not([type='checkbox']), select, textarea) {
+    font-size: 16px;
+  }
+  .api-page .choice-control--switch {
+    padding: 12px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .choice-control-mark,
+  .choice-control-mark::after {
+    transition: none;
   }
 }

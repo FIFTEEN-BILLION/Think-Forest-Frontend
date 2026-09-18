@@ -11,6 +11,7 @@ import {
 } from '../../../api/v1/chat';
 import { newIdempotencyKey, V1Error } from '../../../api/v1/client';
 import {
+  addWordbookEntry,
   cancelConversation,
   completeConversation,
   getConversation,
@@ -320,11 +321,18 @@ function ConversationChat({
   const [cancelArmed, setCancelArmed] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const completeKey = useRef(newIdempotencyKey());
-  const { listening, listen } = useSpeechInput(
-    setText,
-    toast,
-    '내 생각에는 컵이 너무 차가워서 공기 속의 물이 컵 겉에 붙은 것 같아요.',
-  );
+  const saveWord = async (messageId: string, word: string) => {
+    try {
+      await addWordbookEntry(client, { word, messageId, conversationId });
+      toast(`'${word}'을(를) 단어 보관함에 담았어요.`);
+    } catch (error) {
+      toast(error instanceof V1Error ? error.message : '낱말을 담지 못했어요.');
+    }
+  };
+  const { listening, listen } = useSpeechInput(setText, toast, undefined, {
+    conversationId,
+    questionId: view?.interaction?.questionId,
+  });
 
   const applyDetail = useCallback(
     (request: Promise<ConversationDetail>, isActive: () => boolean = () => true) =>
@@ -605,6 +613,7 @@ function ConversationChat({
             pendingText={pending?.text}
             pendingFailed={pending?.failed}
             thinking={sending}
+            onSaveWord={saveWord}
           />
           {notice && (
             <div role="alert" className="chat-notice">

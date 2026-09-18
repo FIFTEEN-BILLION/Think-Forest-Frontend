@@ -3,10 +3,11 @@ import type { PropsWithChildren } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../api/ApiClientProvider';
 import { ApiError } from '../api/client';
-import { errorMessage, json } from '../api/requestOptions';
+import { errorMessage } from '../api/requestOptions';
 import { replaceAccount } from '../api/serverCache';
 import { serverKeys } from '../api/serverKeys';
-import type { Me, Token } from '../types/backend';
+import type { Me } from '../types/backend';
+import { useAuth } from './AuthProvider';
 
 type Request = <T>(path: string, options?: RequestInit) => Promise<T>;
 interface Backend {
@@ -31,27 +32,19 @@ export function BackendProvider({
 }: PropsWithChildren<{ devLoginEnabled?: boolean }>) {
   const api = useApiClient();
   const cache = useQueryClient();
-  // Credentials remain in memory, outside both the query cache and browser storage.
-  const token = useRef('');
-  const refresh = useRef<Promise<string> | null>(null);
+  const auth = useAuth();
+  // 세션은 AuthProvider 의 v1 클라이언트 하나만 갖는다. 여기서 또 refresh 하면
+  // 서버가 refresh 토큰을 돌려 발급할 때 서로의 세션을 끊는다.
+  const token = useRef(auth.client.getSession()?.accessToken ?? '');
   const renew = useCallback(async () => {
-    if (!refresh.current) {
-      refresh.current = api<Token>('api/v1/auth/token/refresh', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      })
-        .then((r) => {
-          token.current = r.accessToken;
-          return r.accessToken;
-        })
-        .finally(() => {
-          refresh.current = null;
-        });
+    const session = await auth.client.refresh();
+    if (!session) {
+      token.current = '';
+      throw new ApiError(401, '{"error":{"code":"UNAUTHORIZED"}}');
     }
-    return refresh.current;
-  }, [api]);
+    token.current = session.accessToken;
+    return session.accessToken;
+  }, [auth]);
   const request = useCallback<Request>(
     async <T,>(path: string, options: RequestInit = {}) => {
       const perform = () => {
@@ -88,7 +81,10 @@ export function BackendProvider({
   );
   const account = useQuery<Me | null>({
     queryKey: serverKeys.me,
+    enabled: auth.status !== 'loading',
     queryFn: async () => {
+      if (auth.status === 'signedOut') return null;
+      token.current = auth.client.getSession()?.accessToken ?? token.current;
       try {
         if (!token.current) await renew();
         return await request<Me>('me');
@@ -112,21 +108,10 @@ export function BackendProvider({
   const login = useMutation({
     mutationKey: ['auth', 'login'],
     mutationFn: async () => {
-      const key = 'jjcp-device-child';
-      let deviceKey = localStorage.getItem(key);
-      if (!deviceKey) {
-        deviceKey = crypto.randomUUID();
-        localStorage.setItem(key, deviceKey);
-      }
-      const result = await api<Token>('api/v1/auth/dev/login', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceKey, nickname: '새싹' }),
-      });
-      token.current = result.accessToken;
-      const me = await request<Me>('me');
-      return me;
+      // 개발용 로그인도 v1 클라이언트를 거쳐야 세션이 한 벌로 유지된다.
+      await auth.loginAsDev('새싹');
+      token.current = auth.client.getSession()?.accessToken ?? '';
+      return await request<Me>('me');
     },
     onSuccess: async (me) => {
       await replaceAccount(cache, me);
@@ -134,7 +119,7 @@ export function BackendProvider({
   });
   const logout = useMutation({
     mutationKey: ['auth', 'logout'],
-    mutationFn: () => request('auth/logout', json({})),
+    mutationFn: () => auth.logout(),
     onSuccess: async () => {
       token.current = '';
       await replaceAccount(cache, null);
@@ -147,7 +132,8 @@ export function BackendProvider({
       value={{
         devLoginEnabled,
         me: account.data ?? null,
-        loading: account.isPending || login.isPending || logout.isPending,
+        loading:
+          auth.status === 'loading' || account.isPending || login.isPending || logout.isPending,
         error: failure ? errorMessage(failure) : '',
         profileId:
           account.data?.profiles.find((p) => p.isDefault)?.id ?? account.data?.profile?.id ?? '',

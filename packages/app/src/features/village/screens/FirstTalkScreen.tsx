@@ -86,11 +86,9 @@ export function FirstTalkScreen() {
   // StrictMode 에서 effect 가 두 번 돌아도 같은 키라 세션이 하나만 생긴다.
   const startKey = useRef(newIdempotencyKey());
   const completeKey = useRef(newIdempotencyKey());
-  const { listening, listen } = useSpeechInput(
-    setInput,
-    toast,
-    '나는 지우야. 2학년이고 공룡을 정말 좋아해!',
-  );
+  const { listening, listen } = useSpeechInput(setInput, toast, undefined, {
+    questionId: session?.interaction?.questionId,
+  });
 
   const applyLoad = useCallback(
     (request: Promise<FirstGreetingSession>, isActive: () => boolean = () => true) =>

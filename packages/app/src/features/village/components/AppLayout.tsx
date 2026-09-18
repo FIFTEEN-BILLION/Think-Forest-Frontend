@@ -1,6 +1,8 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '../../../providers/AuthProvider';
 import { VillageProvider, useVillage } from '../state/VillageProvider';
+import { NotificationBell } from './NotificationBell';
 import { Icon } from './Icon';
 import { Notice } from './ui';
 import type { Theme } from '../types';
@@ -20,6 +22,8 @@ export function VillageRoot() {
 }
 function AppLayout() {
   const { data, update, storageError, message } = useVillage();
+  const { status } = useAuth();
+  const signedIn = status === 'signedIn';
   const [menu, setMenu] = useState(false);
   const location = useLocation();
   const sidebar = useRef<HTMLElement>(null);
@@ -121,7 +125,7 @@ function AppLayout() {
         >
           <Icon name="close" />
         </button>
-        <div className="nav-caption">지우의 생각 놀이터</div>
+        <div className="nav-caption">{data.profile.name || '나'}의 생각 놀이터</div>
         <nav className="nav">
           {navigation.map((n) => (
             <NavLink
@@ -142,11 +146,9 @@ function AppLayout() {
         </nav>
         <div className="side-bottom">
           <div className="seed-note">
-            <strong>오늘은 7분 이야기했어요!</strong>
+            <strong>{signedIn ? '오늘도 티키가 기다려요!' : '티키와 이야기해 볼까요?'}</strong>
             <p>
-              조금만 더 이야기하면
-              <br />
-              오늘의 책이 완성돼요.
+              {signedIn ? '이야기를 마치면 책장에 담겨요.' : '로그인하면 이야기가 책장에 저장돼요.'}
             </p>
           </div>
           <Link to="/profile" className="child-card" onClick={() => setMenu(false)}>
@@ -185,7 +187,8 @@ function AppLayout() {
             </div>
           </div>
           <div className="top-actions">
-            <span className="status">목데이터 체험</span>
+            <span className="status">{signedIn ? '티키 서버 연결됨' : '로그인 전'}</span>
+            {signedIn && <NotificationBell />}
             <button
               className="icon-btn"
               onClick={cycleTheme}
@@ -213,7 +216,8 @@ function AppLayout() {
           <footer className="footer">
             <span>작은 질문이 모여, 단단한 생각이 되는 곳.</span>
             <Link to="/tech">
-              AI 미연결 · 이 기기에만 저장돼요 <Icon name="arrow" />
+              {signedIn ? '연결 상태와 안전 안내 보기' : '이 기기에만 저장돼요'}{' '}
+              <Icon name="arrow" />
             </Link>
           </footer>
         </main>

@@ -1,5 +1,5 @@
 // 서버 대화 화면(티키와 첫인사·티키와 이야기)이 함께 쓰는 채팅 조각. 기존 채팅 CSS 클래스를 그대로 쓴다.
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ChatMessage, ChoiceOption } from '../../../api/v1/types';
 import { useVillage } from '../state/VillageProvider';
 import { MAX_UTTERANCE_SECONDS, useVoiceInput } from '../voice/useVoiceInput';
@@ -60,6 +60,56 @@ export function VoiceSubtitle() {
   );
 }
 
+/** 티키 말에서 아이가 담을 만한 낱말 후보. 조사·기호를 떼고 두 글자 이상만 남긴다. */
+export function wordCandidates(text: string): string[] {
+  const words = text
+    .replace(/[^가-힣0-9a-zA-Z\s]/g, ' ')
+    .split(/\s+/)
+    .map((word) => word.replace(/(이|가|은|는|을|를|에서|에게|에|와|과|도|만|으로|로)$/, ''))
+    .filter((word) => [...word].length >= 2 && /[가-힣]/.test(word));
+  return [...new Set(words)].slice(0, 8);
+}
+
+function SaveWord({
+  messageId,
+  text,
+  onSave,
+}: {
+  messageId: string;
+  text: string;
+  onSave: (messageId: string, word: string) => Promise<void> | void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState<string[]>([]);
+  const words = wordCandidates(text);
+  if (!words.length) return null;
+  return (
+    <div className="save-word">
+      <button type="button" className="text-back" onClick={() => setOpen((v) => !v)}>
+        {open ? '낱말 그만 담기' : '📒 어려운 낱말 담기'}
+      </button>
+      {open && (
+        <div className="choice-chips" role="group" aria-label="단어 보관함에 담을 낱말 고르기">
+          {words.map((word) => (
+            <button
+              type="button"
+              key={word}
+              className={`choice-chip small ${saved.includes(word) ? 'selected' : ''}`}
+              disabled={saved.includes(word)}
+              onClick={async () => {
+                await onSave(messageId, word);
+                setSaved((list) => [...list, word]);
+              }}
+            >
+              {saved.includes(word) ? `${word} ✓` : word}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function ChatThread({
   messages,
   childName,
@@ -67,6 +117,7 @@ export function ChatThread({
   pendingFailed = false,
   thinking,
   variant,
+  onSaveWord,
 }: {
   messages: readonly ChatMessage[];
   childName: string;
@@ -74,6 +125,8 @@ export function ChatThread({
   pendingFailed?: boolean;
   thinking: boolean;
   variant: 'first' | 'talk';
+  /** 있으면 티키 말 아래에 '낱말 담기'가 보인다(단어 보관함, 명세 13절). */
+  onSaveWord?: (messageId: string, word: string) => Promise<void> | void;
 }) {
   const threadRef = useRef<HTMLDivElement | null>(null);
   const { data, toast } = useVillage();
@@ -106,6 +159,7 @@ export function ChatThread({
           <p>{text}</p>
         )}
         {readable && readAloud(key, text)}
+        {readable && onSaveWord && <SaveWord messageId={key} text={text} onSave={onSaveWord} />}
       </div>
     </div>
   );

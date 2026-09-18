@@ -111,6 +111,17 @@ export const FORESTS: Record<
 };
 export const CATALOG: CatalogActivity[] = [
   {
+    id: 'path-teaching',
+    track: 'lab',
+    title: '티키에게 길 찾는 법 가르치기',
+    subtitle: '내 규칙대로 움직이는 티키, 우체국까지 갈 수 있을까?',
+    duration: 15,
+    level: '쉬움',
+    tags: ['티키 가르치기', '규칙', '시험해 보기'],
+    description:
+      '카드로 티키에게 규칙을 가르치고, 티키가 멈춘 까닭을 찾아 규칙을 고쳐요. 마지막엔 새 지도에서 혼자 해결해요.',
+  },
+  {
     id: 'first-inquiry',
     track: 'lab',
     title: '빛과 그림자, 나의 첫 탐구',

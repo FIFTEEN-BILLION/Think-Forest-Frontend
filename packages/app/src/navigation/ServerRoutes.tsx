@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from 'react';
-import { useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { useBackend } from '../providers/BackendProvider';
 import {
@@ -17,7 +17,9 @@ import { ServerData, ServerProfile, ServerReport, ServerTech } from '../screens/
 export function ServerRoutes({ children }: PropsWithChildren) {
   const { demo, me } = useBackend();
   const { pathname, search } = useLocation();
-  if (demo) return <>{children}</>;
+  if (demo || pathname === '/login') return <>{children}</>;
+  if (pathname === '/talk' && me?.user.needsFirstGreeting)
+    return <Navigate replace to={`/first-talk?next=${encodeURIComponent(pathname + search)}`} />;
   if (
     me?.user.role === 'GUARDIAN' &&
     !['/', '/profile', '/report', '/data', '/tech', '/community'].includes(pathname) &&

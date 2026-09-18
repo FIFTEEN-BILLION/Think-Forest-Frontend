@@ -4,7 +4,7 @@ import { VillageProvider, useVillage } from '../providers/VillageProvider';
 import { Icon } from './Icon';
 import { Notice } from './ui';
 import type { Theme } from '../types/village';
-import { BackendProvider, useBackend } from '../providers/BackendProvider';
+import { useBackend } from '../providers/BackendProvider';
 import { BackendGate, BackendStatus } from './BackendGate';
 import { useServerQuery, useAction } from '../hooks/useServerApi';
 import { json } from '../api/requestOptions';
@@ -18,11 +18,9 @@ const navigation = [
 ];
 export function VillageRoot() {
   return (
-    <BackendProvider>
-      <VillageProvider>
-        <AppLayout />
-      </VillageProvider>
-    </BackendProvider>
+    <VillageProvider>
+      <AppLayout />
+    </VillageProvider>
   );
 }
 function AppLayout() {
@@ -48,20 +46,24 @@ function AppLayout() {
   const title =
     location.pathname === '/session/lab' && data.resume?.activityId === 'first-inquiry'
       ? '첫 탐구'
-      : location.pathname.startsWith('/first-talk')
-        ? '티키와 첫 인사'
-        : location.pathname.startsWith('/talk')
-          ? '티키와 대화하기'
-          : location.pathname.startsWith('/topics/new')
-            ? '내가 주제 정하기'
-            : location.pathname.startsWith('/story-share')
-              ? '내 이야기 공유하기'
-              : location.pathname.startsWith('/profile')
-                ? '내 프로필과 설정'
-                : location.pathname.startsWith('/data')
-                  ? '내 기록 관리'
-                  : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))
-                      ?.label ?? '오늘의 이야기');
+      : location.pathname === '/session/lab' && data.resume?.activityId === 'path-teaching'
+        ? '티키 가르치기'
+        : location.pathname.startsWith('/login')
+          ? '로그인'
+          : location.pathname.startsWith('/first-talk')
+            ? '티키와 첫 인사'
+            : location.pathname.startsWith('/talk')
+              ? '티키와 대화하기'
+              : location.pathname.startsWith('/topics/new')
+                ? '내가 주제 정하기'
+                : location.pathname.startsWith('/story-share')
+                  ? '내 이야기 공유하기'
+                  : location.pathname.startsWith('/profile')
+                    ? '내 프로필과 설정'
+                    : location.pathname.startsWith('/data')
+                      ? '내 기록 관리'
+                      : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))
+                          ?.label ?? '오늘의 이야기');
   useEffect(() => {
     document.title = `${title} · 우리 아이 생각친구, 티키`;
     window.scrollTo({ top: 0, behavior: 'instant' });

@@ -6,6 +6,7 @@ import { Icon } from '../components/Icon';
 import { StageArt } from '../components/Simulation';
 import { InquiryComparison } from '../components/InquiryComparison';
 import { ThinkingComparison } from '../components/ThinkingComparison';
+import { PathRecordCard } from '../components/PathParts';
 import {
   Button,
   EmptyState,
@@ -197,7 +198,15 @@ export function RecordDetailScreen() {
           서비스 흐름을 살펴보기 위한 예시 목데이터예요. 실제 아이의 학습 결과가 아니에요.
         </Notice>
       )}
-      {record.thinking ? (
+      {record.path ? (
+        <>
+          <PathRecordCard path={record.path} />
+          <div className="actions">
+            <ReadAloud text={record.text} />
+          </div>
+          <Provenance mock={record.source === 'mock'} />
+        </>
+      ) : record.thinking ? (
         <>
           <ThinkingComparison thinking={record.thinking} />
           <div className="actions">
@@ -315,7 +324,7 @@ export function CompleteScreen() {
         action="책장으로 가기"
       />
     );
-  if (record.thinking)
+  if (record.thinking || record.path)
     return (
       <div className="inquiry">
         <div className="success-head">
@@ -329,10 +338,16 @@ export function CompleteScreen() {
           <p>
             {storageError
               ? '현재 화면에는 남아 있어요. 기기에는 저장하지 못했으니 기록 관리에서 내려받아 주세요.'
-              : '처음 생각부터 친구를 설득한 증거까지, 언제든 다시 볼 수 있어요.'}
+              : record.path
+                ? '처음 가르친 규칙부터 고친 카드까지, 언제든 다시 볼 수 있어요.'
+                : '처음 생각부터 친구를 설득한 증거까지, 언제든 다시 볼 수 있어요.'}
           </p>
         </div>
-        <ThinkingComparison thinking={record.thinking} />
+        {record.path ? (
+          <PathRecordCard path={record.path} />
+        ) : (
+          record.thinking && <ThinkingComparison thinking={record.thinking} />
+        )}
         <div className="actions split">
           <Link to="/" className="btn light">
             첫 화면으로

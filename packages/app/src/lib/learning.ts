@@ -9,6 +9,14 @@ import {
   thinkingGuard,
   thinkingTransition,
 } from './thinking';
+import {
+  derivePathSkills,
+  emptyPath,
+  pathComplete,
+  pathGuard,
+  pathTransition,
+  programText,
+} from './path';
 import type {
   Draft,
   Answer,
@@ -21,6 +29,7 @@ import type {
   VillageData,
 } from '../types/village';
 
+export const PATH_ACTIVITY = 'path-teaching';
 export function count(text: string) {
   return [...text.replace(/\s/g, '')].length;
 }
@@ -133,6 +142,7 @@ export function createDraft(track: Track, activityId: string, min: number, keywo
     followup: '',
     hints: 0,
     ...(activityId === 'first-inquiry' ? { thinking: emptyThinking() } : {}),
+    ...(activityId === PATH_ACTIVITY ? { path: emptyPath() } : {}),
     lab: {
       mode: activityId === 'balance' ? 'balance' : activityId === 'custom' ? 'custom' : 'shadow',
       topic: '',
@@ -162,6 +172,7 @@ export function writingStep(d: Draft) {
       : d.step === 3;
 }
 export function guard(d: Draft): string | null {
+  if (d.activityId === PATH_ACTIVITY) return pathGuard(d);
   if (d.activityId === 'first-inquiry') return d.thinking ? thinkingGuard(d) : inquiryGuard(d);
   if (writingStep(d) && count(d.text) < d.min)
     return `공백을 빼고 ${d.min}자 이상, 내 생각을 먼저 적어 주세요.`;
@@ -186,6 +197,7 @@ export function guard(d: Draft): string | null {
 }
 // All progress changes pass this pure transition function; disabled buttons are only a UI aid.
 export function transition(draft: Draft, event: LearningEvent): { draft: Draft; error?: string } {
+  if (draft.activityId === PATH_ACTIVITY) return pathTransition(draft, event);
   if (draft.activityId === 'first-inquiry')
     return draft.thinking ? thinkingTransition(draft, event) : inquiryTransition(draft, event);
   const d = structuredClone(draft);
@@ -272,6 +284,7 @@ export function transition(draft: Draft, event: LearningEvent): { draft: Draft; 
   return { draft: d };
 }
 export function readyToComplete(d: Draft) {
+  if (d.activityId === PATH_ACTIVITY) return pathComplete(d);
   if (d.activityId === 'first-inquiry')
     return d.thinking ? thinkingComplete(d) : inquiryComplete(d);
   if (d.track === 'forest')
@@ -304,6 +317,33 @@ export function scoreAnswers(answers: Answer[]): Rubric {
 }
 export function toRecord(d: Draft): SessionRecord {
   if (!readyToComplete(d)) throw new Error('모든 단계를 마친 뒤 기록을 남길 수 있어요.');
+  const p = d.path;
+  if (p) {
+    const said = p.turns.filter((t) => t.kind !== 'unmapped').map((t) => t.text);
+    const wins = p.runs.filter((r) => r.outcome === 'arrived');
+    const answers: Answer[] = [
+      { question: '티키에게 처음 한 말', text: said[0] ?? '' },
+      { question: '고쳐서 다시 한 말', text: said.slice(1).join('\n') || '아직 없음' },
+      {
+        question: '우체국에 도착한 말',
+        text: wins.length ? programText(wins[wins.length - 1]!.program) : '아직 없음',
+      },
+    ];
+    return {
+      id: d.id,
+      track: d.track,
+      activityId: d.activityId,
+      title: d.title,
+      date: localDate(),
+      completedAt: new Date().toISOString(),
+      durationMinutes: Math.max(1, Math.round((Date.now() - Date.parse(d.startedAt)) / 60000)),
+      source: 'local',
+      text: answers.map((a) => `${a.question}\n${a.text}`).join('\n\n'),
+      answers,
+      favorite: false,
+      path: { ...p, skills: derivePathSkills(p) },
+    };
+  }
   const t = d.thinking;
   if (t) {
     const taught = t.exchanges.find((x) => x.convinced) ?? t.exchanges[t.exchanges.length - 1];

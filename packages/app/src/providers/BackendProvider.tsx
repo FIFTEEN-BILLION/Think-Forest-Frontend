@@ -10,6 +10,7 @@ import type { Me, Token } from '../types/backend';
 
 type Request = <T>(path: string, options?: RequestInit) => Promise<T>;
 interface Backend {
+  devLoginEnabled: boolean;
   me: Me | null;
   loading: boolean;
   error: string;
@@ -24,7 +25,10 @@ interface Backend {
 const Context = createContext<Backend | null>(null);
 
 /** Context exposes the authenticated transport; TanStack Query owns all account data. */
-export function BackendProvider({ children }: PropsWithChildren) {
+export function BackendProvider({
+  children,
+  devLoginEnabled = false,
+}: PropsWithChildren<{ devLoginEnabled?: boolean }>) {
   const api = useApiClient();
   const cache = useQueryClient();
   // Credentials remain in memory, outside both the query cache and browser storage.
@@ -140,6 +144,7 @@ export function BackendProvider({ children }: PropsWithChildren) {
   return (
     <Context.Provider
       value={{
+        devLoginEnabled,
         me: account.data ?? null,
         loading: account.isPending || login.isPending || logout.isPending,
         error: failure ? errorMessage(failure) : '',

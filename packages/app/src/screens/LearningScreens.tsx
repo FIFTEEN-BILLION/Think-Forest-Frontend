@@ -3,6 +3,7 @@ import type { ChatMessage, ChatSession } from '../types/conversation';
 import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { json } from '../api/requestOptions';
+import { safeReturnTo } from '../api/v1/chat';
 import { useAction, useServerQuery } from '../hooks/useServerApi';
 import { useBackend } from '../providers/BackendProvider';
 import { Message, Wait } from '../components/QueryFeedback';
@@ -17,8 +18,12 @@ export function ServerTalk({ greeting = false }: { greeting?: boolean }) {
   const navigate = useNavigate();
   const location = useLocation();
   const params = new URLSearchParams(location.search);
-  const existing = params.get('session');
-  const topic = params.get('topic') ?? 'topic_ice_cup';
+  const existing =
+    params.get('session') ??
+    params.get('conversationId') ??
+    (greeting ? params.get('sessionId') : null);
+  const topic = params.get('topic') ?? params.get('topicId') ?? 'topic_ice_cup';
+  const returnTo = safeReturnTo(params.get('next'));
   const pendingMessage = useRef<{ text: string; key: string } | null>(null);
   const playback = useRef<{ player: HTMLAudioElement; url: string } | null>(null);
   const mounted = useRef(true);
@@ -39,6 +44,11 @@ export function ServerTalk({ greeting = false }: { greeting?: boolean }) {
   const [text, setText] = useState('');
   const prefix = greeting ? 'first-greeting/sessions' : 'conversations';
   const conversation = useConversation({ greeting, existing, topic });
+  const completedStory = useServerQuery<{ story: { title: string; body: string } }>(
+    conversation.data?.status === 'COMPLETED' && conversation.data.storyId
+      ? `stories/${conversation.data.storyId}`
+      : null,
+  );
   if (!conversation.data) return <Wait error={conversation.error} retry={conversation.retry} />;
   const session = conversation.data;
   const id = session.sessionId ?? session.conversationId!;
@@ -71,7 +81,8 @@ export function ServerTalk({ greeting = false }: { greeting?: boolean }) {
       if (result.completion) {
         sessionStorage.removeItem(`jjcp-active-${backend.me?.user.id}-${prefix}-${topic}`);
         await backend.refreshMe();
-        if (result.completion.story) navigate(`/shelf/${result.completion.story.id}`);
+        if (greeting) navigate(returnTo);
+        else if (result.completion.story) navigate(`/shelf/${result.completion.story.id}`);
       }
     });
   const complete = () =>
@@ -82,7 +93,7 @@ export function ServerTalk({ greeting = false }: { greeting?: boolean }) {
       );
       await backend.refreshMe();
       sessionStorage.removeItem(`jjcp-active-${backend.me?.user.id}-${prefix}-${topic}`);
-      navigate(result.story ? `/shelf/${result.story.id}` : '/');
+      navigate(greeting ? returnTo : result.story ? `/shelf/${result.story.id}` : '/');
     });
   return (
     <div className="server-chat">
@@ -230,6 +241,20 @@ export function ServerTalk({ greeting = false }: { greeting?: boolean }) {
       ) : (
         <section className="panel">
           <h2>이야기를 마쳤어요.</h2>
+          {session.storyId &&
+            (completedStory.data ? (
+              <article>
+                <h3>{completedStory.data.story.title}</h3>
+                <p>{completedStory.data.story.body}</p>
+              </article>
+            ) : (
+              <Wait error={completedStory.error} retry={completedStory.refetch} />
+            ))}
+          {greeting && (
+            <Link className="btn" to={returnTo}>
+              이어서 시작하기
+            </Link>
+          )}
           <Link className="btn" to={session.storyId ? `/shelf/${session.storyId}` : '/shelf'}>
             저장된 기록 보기
           </Link>

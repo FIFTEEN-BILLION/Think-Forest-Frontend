@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Icon } from './Icon';
 import { VARIABLE_NAME, changedVars } from '../lib/shadow';
 import { SKILL_LABEL, SKILL_LEVEL_LABEL } from '../lib/thinking';
-import type { AiSource, ShadowSetup, SkillResult } from '../types/village';
+import type { AiSource, ShadowSetup, SkillLevel, SkillResult } from '../types/village';
 
 // The same affine scale keeps light, stick top and shadow end on one straight ray.
 const KX = 60,
@@ -99,9 +99,11 @@ export function ExperimentPair({
 export function FriendBubble({
   source,
   children,
+  name = '생각 친구',
 }: {
   source: AiSource | null;
   children: ReactNode;
+  name?: string;
 }) {
   return (
     <div className="friend-bubble">
@@ -111,10 +113,10 @@ export function FriendBubble({
       <div>
         <span className={`tag ${source === 'fallback' ? 'gold' : 'teal'}`}>
           {source === 'ai'
-            ? '생각 친구 · AI'
+            ? `${name} · AI`
             : source === 'fallback'
-              ? '생각 친구 · 준비된 대사'
-              : '생각 친구'}
+              ? `${name} · 준비된 대사`
+              : name}
         </span>
         <p>{children}</p>
       </div>
@@ -168,19 +170,27 @@ export function VoicePlaceholder() {
   );
 }
 
-export function ThinkingSkillsCard({ skills }: { skills: SkillResult[] }) {
+export function ThinkingSkillsCard<S extends string = SkillResult['skill']>({
+  skills,
+  labels = SKILL_LABEL as Record<S, { name: string; describe: string }>,
+  title = '이번 탐구에서 쓴 생각 기술',
+}: {
+  skills: { skill: S; level: SkillLevel; quote: string }[];
+  labels?: Record<S, { name: string; describe: string }>;
+  title?: string;
+}) {
   return (
     <section className="panel space-top">
-      <h2>이번 탐구에서 쓴 생각 기술</h2>
+      <h2>{title}</h2>
       <p className="muted">점수가 아니라, 실제로 한 행동을 기준으로 적었어요.</p>
       <ul className="skill-list">
         {skills.map((s) => (
           <li key={s.skill} className={`skill-row ${s.level}`}>
-            <strong>{SKILL_LABEL[s.skill].name}</strong>
+            <strong>{labels[s.skill].name}</strong>
             <span className={`tag ${s.level === 'notShown' ? '' : 'teal'}`}>
               {SKILL_LEVEL_LABEL[s.level]}
             </span>
-            <small>{SKILL_LABEL[s.skill].describe}</small>
+            <small>{labels[s.skill].describe}</small>
             {s.level !== 'notShown' && s.quote.trim() && <blockquote>{s.quote}</blockquote>}
           </li>
         ))}

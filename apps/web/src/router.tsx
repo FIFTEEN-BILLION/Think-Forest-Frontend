@@ -20,6 +20,12 @@ export const router = createBrowserRouter([
     ErrorBoundary: NotFoundScreen,
     children: [
       { index: true, Component: HomeScreen },
+      {
+        path: 'login',
+        lazy: async () => ({
+          Component: (await import('@jjcp/app/screens/LoginScreen')).LoginScreen,
+        }),
+      },
       { path: 'adventures', lazy: adventures },
       { path: 'adventures/:track', lazy: adventures },
       { path: 'adventures/:track/:activityId', lazy: adventures },

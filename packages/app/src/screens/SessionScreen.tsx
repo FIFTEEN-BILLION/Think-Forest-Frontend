@@ -20,6 +20,7 @@ import { useVillage } from '../providers/VillageProvider';
 import type { Draft } from '../types/village';
 import { useStepFocus } from '../hooks/useStepFocus';
 import { InquiryScreen } from './InquiryScreen';
+import { PathTeachingScreen } from './PathTeachingScreen';
 import { ThinkingInquiryScreen } from './ThinkingInquiryScreen';
 
 export function SessionScreen() {
@@ -36,6 +37,8 @@ export function SessionScreen() {
       />
     );
   if (track !== d.track) return <Navigate to={`/session/${d.track}`} replace />;
+  if (d.activityId === 'path-teaching' && d.path)
+    return <PathTeachingScreen key={d.id} draft={d} />;
   if (d.activityId === 'first-inquiry' && d.thinking)
     return <ThinkingInquiryScreen key={d.id} draft={d} />;
   // Legacy v1 drafts saved before the thinking engine keep their original flow.

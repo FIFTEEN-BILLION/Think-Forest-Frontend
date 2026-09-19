@@ -399,9 +399,9 @@ function TalkSession({ greeting }: { greeting: boolean }) {
             )}
           </div>
           {session.status !== 'COMPLETED' ? (
-            <section className="server-composer first-answer">
+            <section className="server-composer" aria-label="내 생각 나누기">
               {interaction?.type === 'SINGLE_CHOICE' ? (
-                <div className="choice-row">
+                <div className="composer-choices" role="group" aria-label="생각 고르기">
                   {interaction.options.map((option) => (
                     <button
                       className="chip"
@@ -415,62 +415,71 @@ function TalkSession({ greeting }: { greeting: boolean }) {
                 </div>
               ) : (
                 <>
-                  <label>
+                  <label className="composer-field">
                     내 생각
                     <textarea
                       value={text}
-                      rows={2}
+                      rows={3}
                       maxLength={1000}
                       onChange={(e) => setText(e.target.value)}
                       placeholder="내 생각에는…"
                     />
                   </label>
-                  <VoiceInput
-                    key={`${id}-${interaction?.questionId ?? ''}`}
-                    sessionId={id}
-                    questionId={interaction?.questionId}
-                    onText={setText}
-                    disabled={action.busy}
-                  />
-                  <button
-                    className="btn"
-                    disabled={action.busy || !text.trim()}
-                    onClick={() => void send({ type: 'TEXT', text })}
-                  >
-                    내 생각 보내기
-                  </button>
+                  <div className="composer-tools">
+                    <VoiceInput
+                      key={`${id}-${interaction?.questionId ?? ''}`}
+                      sessionId={id}
+                      questionId={interaction?.questionId}
+                      onText={setText}
+                      disabled={action.busy}
+                    />
+                    <button
+                      className="btn composer-send"
+                      disabled={action.busy || !text.trim()}
+                      onClick={() => void send({ type: 'TEXT', text })}
+                    >
+                      내 생각 보내기 <Icon name="arrow" />
+                    </button>
+                  </div>
                 </>
               )}
-              <div className="row between">
-                <span>이야기 진행 {session.readiness.progress}%</span>
-                {!(greeting && interaction?.options.some((o) => o.id === 'CONFIRM_PROFILE')) && (
-                  <button
-                    className="btn light"
-                    disabled={action.busy || !session.readiness.ready}
-                    onClick={() => void complete()}
-                  >
-                    {greeting ? '첫 인사 마치기' : '이야기 완성하기'}
-                  </button>
-                )}
+              <div className="composer-footer">
+                <div className="composer-progress">
+                  <span>
+                    이야기 진행 <strong>{session.readiness.progress}%</strong>
+                  </span>
+                  <ReadinessBar value={session.readiness.progress} label="이야기 진행" />
+                </div>
+                <div className="composer-session-actions">
+                  {!(greeting && interaction?.options.some((o) => o.id === 'CONFIRM_PROFILE')) && (
+                    <button
+                      className="btn light"
+                      disabled={action.busy || !session.readiness.ready}
+                      onClick={() => void complete()}
+                    >
+                      {greeting ? '첫 인사 마치기' : '이야기 완성하기'}
+                    </button>
+                  )}
+                  {!greeting && (
+                    <button
+                      className="btn light composer-cancel"
+                      disabled={action.busy}
+                      onClick={async () => {
+                        if (await confirmAction('이 대화를 그만둘까요?'))
+                          void action.run(async () => {
+                            await backend.request(`conversations/${id}/cancel`, json({}));
+                            sessionStorage.removeItem(
+                              `jjcp-active-${backend.scopeId}-${prefix}-${topic}`,
+                            );
+                            navigate('/');
+                          });
+                      }}
+                    >
+                      대화 그만두기
+                    </button>
+                  )}
+                </div>
               </div>
-              {!greeting && (
-                <button
-                  className="btn light"
-                  disabled={action.busy}
-                  onClick={async () => {
-                    if (await confirmAction('이 대화를 그만둘까요?'))
-                      void action.run(async () => {
-                        await backend.request(`conversations/${id}/cancel`, json({}));
-                        sessionStorage.removeItem(
-                          `jjcp-active-${backend.scopeId}-${prefix}-${topic}`,
-                        );
-                        navigate('/');
-                      });
-                  }}
-                >
-                  대화 그만두기
-                </button>
-              )}
             </section>
           ) : (
             <section className="panel">

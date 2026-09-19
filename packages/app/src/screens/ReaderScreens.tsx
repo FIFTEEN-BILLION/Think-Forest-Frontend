@@ -20,14 +20,17 @@ export type RecordItem = Model<'StorySummary'>;
 export type PublicStory = Model<'PublicStoryDetail'>;
 export function More({
   next,
+  current = '',
   go,
 }: {
   next: string | null | undefined;
+  current?: string;
   go: (cursor: string) => void;
 }) {
+  if (!current && !next) return null;
   return (
     <div className="row pagination">
-      <button className="btn light" onClick={() => go('')}>
+      <button className="btn light" disabled={!current} onClick={() => go('')}>
         처음으로
       </button>
       <button className="btn light" disabled={!next} onClick={() => go(next!)}>
@@ -106,7 +109,16 @@ export function ServerLibrary() {
         <Wait error={q.error} retry={q.refetch} />
       ) : (
         <>
-          <div className="cards books">
+          {!!q.data.items.length && (
+            <div className="library-section-head">
+              <div>
+                <h2>나의 기록</h2>
+                <p>기록을 펼쳐 보거나, 마음에 드는 이야기를 한 권으로 묶어 보세요.</p>
+              </div>
+              <span>{q.data.items.length}개의 기록</span>
+            </div>
+          )}
+          <div className="cards books library-story-grid">
             {q.data.items.map((s) => (
               <article className="book" key={s.id}>
                 <Link
@@ -118,28 +130,35 @@ export function ServerLibrary() {
                   <Icon name={contentAppearance(s.category).icon} />
                 </Link>
                 <div className="book-body">
-                  <span className={`tag ${contentAppearance(s.category).color}`}>
-                    {contentAppearance(s.category).label}
-                  </span>
+                  <div className="library-card-meta">
+                    <span className={`tag ${contentAppearance(s.category).color}`}>
+                      {contentAppearance(s.category).label}
+                    </span>
+                    <button
+                      className="library-favorite"
+                      disabled={action.busy}
+                      aria-pressed={s.favorite}
+                      aria-label={s.favorite ? '아끼는 기록에서 빼기' : '아끼는 기록에 담기'}
+                      onClick={() =>
+                        void action.run(async () => {
+                          await request(`stories/${s.id}/favorite`, {
+                            method: s.favorite ? 'DELETE' : 'PUT',
+                          });
+                        })
+                      }
+                    >
+                      <span aria-hidden="true">{s.favorite ? '★' : '☆'}</span>
+                      {s.favorite ? '아끼는 기록' : '아끼기'}
+                    </button>
+                  </div>
                   <p className="line-clamp">{s.summary}</p>
                   <Link className="btn light" to={`/shelf/${s.id}`}>
                     내 생각 펼쳐 보기 <Icon name="arrow" />
                   </Link>
-                  <button
-                    className="btn light"
-                    disabled={action.busy}
-                    onClick={() =>
-                      void action.run(async () => {
-                        await request(`stories/${s.id}/favorite`, {
-                          method: s.favorite ? 'DELETE' : 'PUT',
-                        });
-                      })
-                    }
-                  >
-                    {s.favorite ? '★ 아끼는 기록' : '☆ 아끼는 기록에 담기'}
-                  </button>
                   <ChoiceControl
                     label="이야기책에 넣기"
+                    variant="chip"
+                    className="library-book-toggle"
                     checked={selected.includes(s.id)}
                     onChange={(e) =>
                       select(
@@ -159,44 +178,77 @@ export function ServerLibrary() {
               description="새로운 모험에서 첫 문장을 남겨 보세요."
             />
           )}
-          <More next={q.data.nextCursor} go={go} />
+          <More current={cursor} next={q.data.nextCursor} go={go} />
         </>
       )}
-      <section className="panel">
-        <h2>이야기책 만들기</h2>
-        <label>
-          책 제목 <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} />
-        </label>
-        <button
-          className="btn light"
-          disabled={action.busy || !title.trim() || !selected.length}
-          onClick={() =>
-            void action.run(async () => {
-              const r = await request<Model<'BookResponse'>>(
-                'books',
-                json({ title, storyIds: selected }),
-              );
-              open(r.book.id);
-              select([]);
-            })
-          }
-        >
-          선택한 {selected.length}편으로 책 만들기
-        </button>
-        {books.data ? (
-          <>
-            {books.data.items.map((b) => (
-              <p key={b.id}>
-                <button className="btn light" onClick={() => open(b.id)}>
-                  {b.title} · {b.status === 'COMPLETED' ? '완성' : '편집 중'}
-                </button>
-              </p>
-            ))}
-            <More next={books.data.nextCursor} go={bookGo} />
-          </>
-        ) : (
-          <Wait error={books.error} retry={books.refetch} />
-        )}
+      <section className="panel library-builder">
+        <header className="library-builder-head">
+          <div>
+            <span className="eyebrow">MAKE A STORYBOOK</span>
+            <h2>이야기책 만들기</h2>
+            <p>마음에 드는 기록을 골라 나만의 이야기책으로 묶어 보세요.</p>
+          </div>
+          <span className="library-selection-count">{selected.length}편 선택</span>
+        </header>
+        <div className="library-builder-grid">
+          <form
+            className="library-builder-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void action.run(async () => {
+                const r = await request<Model<'BookResponse'>>(
+                  'books',
+                  json({ title, storyIds: selected }),
+                );
+                open(r.book.id);
+                select([]);
+              });
+            }}
+          >
+            <label>
+              책 제목
+              <input
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="예: 나의 첫 생각책"
+                maxLength={60}
+              />
+            </label>
+            <button className="btn" disabled={action.busy || !title.trim() || !selected.length}>
+              선택한 {selected.length}편으로 책 만들기
+            </button>
+          </form>
+          <div className="library-created-books">
+            <h3>내가 만든 이야기책</h3>
+            {books.data ? (
+              <>
+                {books.data.items.length ? (
+                  <div className="library-book-list">
+                    {books.data.items.map((b) => (
+                      <button className="library-book-row" key={b.id} onClick={() => open(b.id)}>
+                        <span className="library-book-icon" aria-hidden="true">
+                          <Icon name="book" />
+                        </span>
+                        <span>
+                          <strong>{b.title}</strong>
+                          <small>
+                            {b.storyCount}편 · {b.status === 'COMPLETED' ? '완성' : '편집 중'}
+                          </small>
+                        </span>
+                        <Icon name="arrow" />
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="library-book-empty">아직 만든 이야기책이 없어요.</p>
+                )}
+                <More current={bookCursor} next={books.data.nextCursor} go={bookGo} />
+              </>
+            ) : (
+              <Wait error={books.error} retry={books.refetch} />
+            )}
+          </div>
+        </div>
       </section>
       {book && <BookEditor key={book} id={book} close={() => open('')} />}
     </>
@@ -593,7 +645,7 @@ export function ServerWords() {
               description="티키와 대화하다 궁금한 말을 단어 보관함에 담아 보세요."
             />
           )}
-          <More next={q.data.nextCursor} go={go} />
+          <More current={cursor} next={q.data.nextCursor} go={go} />
         </>
       )}
     </>
@@ -760,7 +812,7 @@ export function ServerTopics() {
               </Link>
             ))}
           </div>
-          <More next={topics.data.nextCursor} go={go} />
+          <More current={cursor} next={topics.data.nextCursor} go={go} />
         </>
       ) : (
         <Wait error={topics.error} retry={topics.refetch} />

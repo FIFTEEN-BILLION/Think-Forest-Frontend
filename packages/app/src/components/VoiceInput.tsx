@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { ChoiceControl } from './ChoiceControl';
+import { Icon } from './Icon';
 import { useEffect, useRef, useState } from 'react';
 import { errorMessage, json } from '../api/requestOptions';
 import { useBackend } from '../providers/BackendProvider';
@@ -285,10 +286,12 @@ export function VoiceInput({
   return (
     <div className="voice-input">
       <button
+        type="button"
         className="btn light"
         disabled={pending || ((voiceDisabled || disabled) && !active)}
         onClick={() => void begin()}
       >
+        <Icon name={active ? 'pause' : 'mic'} />
         {active ? '녹음 마치기' : pending ? '음성을 처리하고 있어요…' : '마이크로 입력'}
       </button>
       <ChoiceControl

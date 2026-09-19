@@ -22,6 +22,9 @@ function load(path) {
 }
 const { createMockApiClient } = load(resolve(root, 'api/mock/client.ts'));
 const { createApiClient } = load(resolve(root, 'api/client.ts'));
+const { createV1Client } = load(resolve(root, 'api/v1/client.ts'));
+const { createV1Fetch } = load(resolve(root, 'api/v1/transport.ts'));
+const v1 = load(resolve(root, 'api/v1/endpoints.ts'));
 const json = (body, method = 'POST', headers = {}) => ({
   method,
   body: JSON.stringify(body),
@@ -32,6 +35,62 @@ function memory() {
   const data = new Map();
   return { getItem: (key) => data.get(key) ?? null, setItem: (key, value) => data.set(key, value) };
 }
+
+test('merged v1 auth and guardian screens share the mock transport without network', async (t) => {
+  t.mock.method(globalThis, 'fetch', () => {
+    throw new Error('Network must not be used');
+  });
+  const api = createMockApiClient();
+  const client = createV1Client({ fetch: createV1Fetch(api, '/api/v1') });
+  assert.equal((await client.refresh()).user.id, 'mock-user');
+  const me = await v1.getAccountMe(client);
+  const profileId = me.profiles[0].id;
+  assert.equal((await v1.getProfileSettings(client, profileId)).settings.profileId, profileId);
+  assert.deepEqual(await v1.listConsents(client, profileId), []);
+  assert.deepEqual(await v1.listGuardianChildren(client), []);
+  assert.deepEqual(await v1.listLegalDocuments(client), []);
+  assert.ok((await v1.getProgressReport(client, { profileId, period: '7d' })).timeline.length);
+  assert.deepEqual((await v1.listNotifications(client, {})).items, []);
+  await v1.logout(client);
+  assert.equal(client.getSession(), null);
+  assert.equal(await client.refresh(), null);
+  await v1.devLogin(client, { deviceKey: 'merge-test', nickname: '새싹' });
+  assert.equal((await v1.getAccountMe(client)).user.id, 'mock-user');
+});
+
+test('v1 raw voice requests cannot bypass the mock transport', async (t) => {
+  t.mock.method(globalThis, 'fetch', () => {
+    throw new Error('Network must not be used');
+  });
+  const client = createV1Client({ fetch: createV1Fetch(createMockApiClient(), '/api/v1') });
+  await client.refresh();
+  await assert.rejects(v1.synthesizeSpeech(client, { text: '예시' }), (e) => e.status === 501);
+  await assert.rejects(v1.transcribeRecording(client, new Blob(['test'])), (e) => e.status === 501);
+});
+
+test('v1 transport uses the configured backend and preserves headers and binary responses', async (t) => {
+  const seen = [];
+  t.mock.method(globalThis, 'fetch', async (url, init) => {
+    seen.push({ url, init });
+    if (String(url).endsWith('/speech/synthesis'))
+      return new Response(new Blob(['audio'], { type: 'audio/mpeg' }));
+    return Response.json({ ok: true });
+  });
+  const base = 'https://api.example.test/api/v1';
+  const client = createV1Client({
+    baseUrl: base,
+    fetch: createV1Fetch(createApiClient('https://api.example.test/api'), base),
+  });
+  await client.request('/profiles/example', {
+    method: 'PATCH',
+    headers: { 'If-Match': '"2"' },
+    body: { nickname: '예시' },
+  });
+  assert.equal(seen[0].url, `${base}/profiles/example`);
+  assert.equal(seen[0].init.credentials, 'include');
+  assert.equal(seen[0].init.headers.get('If-Match'), '"2"');
+  assert.equal(await (await v1.synthesizeSpeech(client, { text: '예시' })).text(), 'audio');
+});
 
 test('mock fills all main screens without network access and returns independent snapshots', async (t) => {
   t.mock.method(globalThis, 'fetch', () => {

@@ -1,12 +1,13 @@
-import { createContext, useCallback, useContext, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect } from 'react';
 import type { PropsWithChildren } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../api/ApiClientProvider';
 import { ApiError } from '../api/client';
-import { errorMessage, json } from '../api/requestOptions';
+import { errorMessage } from '../api/requestOptions';
 import { replaceAccount } from '../api/serverCache';
 import { serverKeys } from '../api/serverKeys';
-import type { Me, Token } from '../types/backend';
+import type { Me } from '../types/backend';
+import { useAuth } from './AuthProvider';
 
 type Request = <T>(path: string, options?: RequestInit) => Promise<T>;
 interface Backend {
@@ -33,32 +34,26 @@ export function BackendProvider({
 }: PropsWithChildren<{ devLoginEnabled?: boolean; useApi?: boolean }>) {
   const api = useApiClient();
   const cache = useQueryClient();
-  // Credentials remain in memory, outside both the query cache and browser storage.
-  const token = useRef('');
-  const refresh = useRef<Promise<string> | null>(null);
+  const { client, status, loginAsDev, logout: authLogout } = useAuth();
+  useEffect(() => {
+    if (status === 'signedOut') void replaceAccount(cache, null);
+  }, [cache, status]);
+  // 세션은 AuthProvider 의 v1 클라이언트 하나만 갖는다. 여기서 또 refresh 하면
+  // 서버가 refresh 토큰을 돌려 발급할 때 서로의 세션을 끊는다.
   const renew = useCallback(async () => {
-    if (!refresh.current) {
-      refresh.current = api<Token>('api/v1/auth/token/refresh', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: '{}',
-      })
-        .then((r) => {
-          token.current = r.accessToken;
-          return r.accessToken;
-        })
-        .finally(() => {
-          refresh.current = null;
-        });
+    const session = await client.refresh();
+    if (!session) {
+      throw new ApiError(401, '{"error":{"code":"UNAUTHORIZED"}}');
     }
-    return refresh.current;
-  }, [api]);
+    return session.accessToken;
+  }, [client]);
   const request = useCallback<Request>(
     async <T,>(path: string, options: RequestInit = {}) => {
+      const usedToken = client.getSession()?.accessToken;
       const perform = () => {
         const headers = new Headers(options.headers);
-        if (token.current) headers.set('Authorization', `Bearer ${token.current}`);
+        const token = client.getSession()?.accessToken;
+        if (token) headers.set('Authorization', `Bearer ${token}`);
         return api<T>(`api/v1/${path.replace(/^\//, '')}`, {
           ...options,
           headers,
@@ -75,10 +70,9 @@ export function BackendProvider({
         )
           throw error;
         try {
-          await renew();
+          if (!client.getSession() || client.getSession()?.accessToken === usedToken) await renew();
         } catch (refreshError) {
           if (refreshError instanceof ApiError && refreshError.status === 401) {
-            token.current = '';
             await replaceAccount(cache, null);
           }
           throw refreshError;
@@ -86,13 +80,15 @@ export function BackendProvider({
         return perform();
       }
     },
-    [api, cache, renew],
+    [api, cache, client, renew],
   );
   const account = useQuery<Me | null>({
     queryKey: serverKeys.me,
+    enabled: status !== 'loading',
     queryFn: async () => {
+      if (status === 'signedOut') return null;
       try {
-        if (!token.current) await renew();
+        if (!client.getSession()) await renew();
         return await request<Me>('me');
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) return null;
@@ -114,21 +110,9 @@ export function BackendProvider({
   const login = useMutation({
     mutationKey: ['auth', 'login'],
     mutationFn: async () => {
-      const key = 'jjcp-device-child';
-      let deviceKey = localStorage.getItem(key);
-      if (!deviceKey) {
-        deviceKey = crypto.randomUUID();
-        localStorage.setItem(key, deviceKey);
-      }
-      const result = await api<Token>('api/v1/auth/dev/login', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceKey, nickname: '새싹' }),
-      });
-      token.current = result.accessToken;
-      const me = await request<Me>('me');
-      return me;
+      // 개발용 로그인도 v1 클라이언트를 거쳐야 세션이 한 벌로 유지된다.
+      await loginAsDev('새싹');
+      return await request<Me>('me');
     },
     onSuccess: async (me) => {
       await replaceAccount(cache, me);
@@ -136,9 +120,8 @@ export function BackendProvider({
   });
   const logout = useMutation({
     mutationKey: ['auth', 'logout'],
-    mutationFn: () => request('auth/logout', json({})),
+    mutationFn: () => authLogout(),
     onSuccess: async () => {
-      token.current = '';
       await replaceAccount(cache, null);
       login.reset();
     },
@@ -149,8 +132,8 @@ export function BackendProvider({
       value={{
         useApi,
         devLoginEnabled,
-        me: account.data ?? null,
-        loading: account.isPending || login.isPending || logout.isPending,
+        me: status === 'signedIn' ? (account.data ?? null) : null,
+        loading: status === 'loading' || account.isPending || login.isPending || logout.isPending,
         error: failure ? errorMessage(failure) : '',
         profileId:
           account.data?.profiles.find((p) => p.isDefault)?.id ?? account.data?.profile?.id ?? '',

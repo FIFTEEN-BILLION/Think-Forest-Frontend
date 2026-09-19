@@ -5,6 +5,7 @@ import { Notice } from './ui';
 import type { Theme } from '../types/village';
 import { useBackend } from '../providers/BackendProvider';
 import { BackendGate } from './BackendGate';
+import { NotificationBell } from './NotificationBell';
 import { useServerQuery, useAction } from '../hooks/useServerApi';
 import { json } from '../api/requestOptions';
 import type { Model } from '../api/schema';
@@ -34,26 +35,28 @@ export function VillageRoot() {
   const [menu, setMenu] = useState(false);
   const location = useLocation();
   const sidebar = useRef<HTMLElement>(null);
-  const title = location.pathname.startsWith('/first-talk')
-    ? '티키와 첫 인사'
-    : location.pathname.startsWith('/talk')
-      ? '티키와 대화하기'
-      : location.pathname.startsWith('/login')
-        ? '로그인'
-        : location.pathname.startsWith('/topics/new')
-          ? '내가 주제 정하기'
-          : location.pathname.startsWith('/story-share')
-            ? '내 이야기 공유하기'
-            : location.pathname.startsWith('/profile')
-              ? '내 프로필과 설정'
-              : location.pathname.startsWith('/data')
-                ? '내 기록 관리'
-                : location.pathname.startsWith('/tech')
-                  ? '티키와 기록 안내'
-                  : /^\/(adventures|session)/.test(location.pathname)
-                    ? '생각 모험'
-                    : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))
-                        ?.label ?? '오늘의 이야기');
+  const title = location.pathname.startsWith('/guardian/')
+    ? '보호자 공간'
+    : location.pathname.startsWith('/first-talk')
+      ? '티키와 첫 인사'
+      : location.pathname.startsWith('/talk')
+        ? '티키와 대화하기'
+        : location.pathname.startsWith('/login')
+          ? '로그인'
+          : location.pathname.startsWith('/topics/new')
+            ? '내가 주제 정하기'
+            : location.pathname.startsWith('/story-share')
+              ? '내 이야기 공유하기'
+              : location.pathname.startsWith('/profile')
+                ? '내 프로필과 설정'
+                : location.pathname.startsWith('/data')
+                  ? '내 기록 관리'
+                  : location.pathname.startsWith('/tech')
+                    ? '티키와 기록 안내'
+                    : /^\/(adventures|session)/.test(location.pathname)
+                      ? '생각 모험'
+                      : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))
+                          ?.label ?? '오늘의 이야기');
   useEffect(() => {
     document.title = `${title} · 우리 아이 생각친구, 티키`;
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -241,6 +244,7 @@ export function VillageRoot() {
               </select>
             )}
             <span className="status">{backend.me ? '내 기록' : '함께 시작해요'}</span>
+            <NotificationBell key={backend.scopeId} />
             <button
               className="icon-btn"
               onClick={cycleTheme}

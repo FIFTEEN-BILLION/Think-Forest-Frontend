@@ -1,7 +1,8 @@
 import { confirmAction, promptText } from '../components/dialogs';
 import { ChoiceControl } from '../components/ChoiceControl';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
+import { GuardianNav, GuardianProvider } from '../components/GuardianParts';
 import { useMutation } from '@tanstack/react-query';
 import type { Model } from '../api/schema';
 import { json, errorMessage } from '../api/requestOptions';
@@ -11,6 +12,15 @@ import { ProgressChart } from '../components/ProgressChart';
 import { PageHeading } from '../components/ui';
 import { Message, Wait } from '../components/QueryFeedback';
 import { ConsentHistory, NotificationSettings, SafetyEvents } from '../components/ManagementPanels';
+
+export function ProtectedParentScreen() {
+  const { scopeId } = useBackend();
+  return (
+    <GuardianProvider key={scopeId}>
+      <Outlet />
+    </GuardianProvider>
+  );
+}
 function useProfileSelection() {
   const { profileId: defaultId } = useBackend();
   const [selected, select] = useState('');
@@ -63,6 +73,7 @@ export function ServerProfile() {
         title="내 프로필과 설정"
         description="티키가 기억할 내 이야기와 이용 설정을 살펴봐요."
       />
+      <GuardianNav />
       <Message text={action.message} />
       {selector}
       <form

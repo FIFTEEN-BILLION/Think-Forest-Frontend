@@ -587,6 +587,7 @@ export function createMockApiClient(storage?: Pick<Storage, 'getItem' | 'setItem
     if (
       [
         'guardian-links',
+        'guardian/children',
         'guardian/consultations',
         'guardian/safety-events',
         'consents',

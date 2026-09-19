@@ -1,6 +1,14 @@
-import type { PropsWithChildren, ReactNode } from 'react';
+import type { ButtonHTMLAttributes, PropsWithChildren, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Icon } from './Icon';
+
+export function Button({
+  className = '',
+  type = 'button',
+  ...props
+}: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return <button type={type} className={`btn ${className}`} {...props} />;
+}
 
 export function PageHeading({
   eyebrow,

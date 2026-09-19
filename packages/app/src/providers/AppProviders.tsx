@@ -6,6 +6,8 @@ import { ApiClientProvider } from '../api/ApiClientProvider';
 import { createQueryClient } from '../api/queryClient';
 import { theme } from '../styles/theme';
 import { BackendProvider } from './BackendProvider';
+import { AuthProvider } from './AuthProvider';
+import { resolveApiUrl } from '../api/client';
 import type { ApiRequest } from '../api/client';
 
 type AppProvidersProps = PropsWithChildren<{
@@ -30,9 +32,11 @@ export function AppProviders({
     <ThemeProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
         <ApiClientProvider baseUrl={apiBaseUrl} request={request}>
-          <BackendProvider devLoginEnabled={devLogin} useApi={useApi}>
-            {children}
-          </BackendProvider>
+          <AuthProvider baseUrl={resolveApiUrl(apiBaseUrl, 'api/v1')} devLoginEnabled={devLogin}>
+            <BackendProvider devLoginEnabled={devLogin} useApi={useApi}>
+              {children}
+            </BackendProvider>
+          </AuthProvider>
         </ApiClientProvider>
       </QueryClientProvider>
     </ThemeProvider>

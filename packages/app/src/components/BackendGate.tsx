@@ -16,16 +16,3 @@ export function BackendGate({ children }: PropsWithChildren) {
     />
   );
 }
-export function BackendStatus() {
-  const backend = useBackend();
-  return (
-    <div className="server-status">
-      <span>{backend.me ? '내 계정에 저장돼요' : '로그인이 필요해요'}</span>
-      {backend.me && (
-        <button disabled={backend.loading} onClick={() => void backend.logout()}>
-          로그아웃
-        </button>
-      )}
-    </div>
-  );
-}

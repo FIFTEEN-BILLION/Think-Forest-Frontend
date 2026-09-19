@@ -4,6 +4,8 @@ import { createV1Client, V1_BASE_URL } from '../api/v1/client';
 import type { V1Client } from '../api/v1/client';
 import { devLogin, kakaoAuthorizeUrl, logout as logoutRequest } from '../api/v1/endpoints';
 import type { AuthUser } from '../api/v1/types';
+import { useApiClient } from '../api/ApiClientProvider';
+import { createV1Fetch } from '../api/v1/transport';
 
 export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
 
@@ -20,7 +22,7 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-const DEVICE_KEY = 'jjcp.devDeviceKey';
+const DEVICE_KEY = 'jjcp-device-child';
 
 // 같은 기기는 같은 개발용 사용자로 로그인하도록 기기 키를 보관한다. 저장소가 막혀도 동작한다.
 let memoryDeviceKey = '';
@@ -48,7 +50,11 @@ export function AuthProvider({
   devLoginEnabled = false,
   children,
 }: AuthProviderProps) {
-  const client = useMemo(() => createV1Client({ baseUrl }), [baseUrl]);
+  const api = useApiClient();
+  const client = useMemo(
+    () => createV1Client({ baseUrl, fetch: createV1Fetch(api, baseUrl) }),
+    [api, baseUrl],
+  );
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<AuthUser | null>(null);
 
@@ -81,7 +87,7 @@ export function AuthProvider({
       (await devLogin(client, { deviceKey: deviceKey(), ...(nickname ? { nickname } : {}) })).user,
     [client],
   );
-  const logout = useCallback(() => logoutRequest(client).catch(() => undefined), [client]);
+  const logout = useCallback(() => logoutRequest(client), [client]);
   const updateUser = useCallback((patch: Partial<AuthUser>) => client.updateUser(patch), [client]);
 
   const value = useMemo(

@@ -1,15 +1,7 @@
 // 보호자 화면이 함께 쓰는 상태와 조각들.
 // 가장 중요한 것은 AI 동의 상태다. `ai_conversation` 동의가 없으면 아이 대화는 준비된 대사로만 간다.
 
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { PropsWithChildren, ReactNode } from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { V1Error } from '../api/v1/client';
@@ -21,7 +13,6 @@ import {
   getProfileSettings,
   listConsents,
   listLegalDocuments,
-  toLocalSettings,
 } from '../api/v1/endpoints';
 import type { AiMode, VoiceMode } from '../api/v1/endpoints';
 import type {
@@ -32,7 +23,7 @@ import type {
   GuardianPermission,
 } from '../api/v1/types';
 import { useAuth } from '../providers/AuthProvider';
-import { useVillage } from '../providers/VillageProvider';
+import { useQueryClient } from '@tanstack/react-query';
 import { Icon } from './Icon';
 import { Notice } from './ui';
 
@@ -92,12 +83,12 @@ interface GuardianContextValue {
 const GuardianContext = createContext<GuardianContextValue | null>(null);
 
 /**
- * 보호자 화면 묶음의 공통 상태. 로그인했으면 서버 값을, 아니면 이 기기 설정을 쓴다.
- * 서버 설정을 받으면 기기 설정에도 그대로 옮겨서 아이 화면이 같은 값을 쓰게 한다.
+ * 보호자 화면도 앱과 같은 인증·실제/목 요청 경로를 사용한다.
+ * 설정이 바뀌면 공통 쿼리를 갱신하여 아이 화면에 반영한다.
  */
 export function GuardianProvider({ children }: PropsWithChildren) {
   const { status, client } = useAuth();
-  const { update } = useVillage();
+  const cache = useQueryClient();
   const signedIn = status === 'signedIn';
   // 로그아웃하면 아래 값들을 비우는 대신 signedIn 으로 가려서 보여 준다(효과 안에서 setState 를 피한다).
   const [loadedProfiles, setProfiles] = useState<MeProfileItem[]>([]);
@@ -113,7 +104,6 @@ export function GuardianProvider({ children }: PropsWithChildren) {
   const [loadedOnce, setLoadedOnce] = useState(false);
   const [error, setError] = useState('');
   const [tick, setTick] = useState(0);
-  const syncedSettings = useRef('');
 
   const reload = useCallback(() => setTick((n) => n + 1), []);
 
@@ -165,15 +155,11 @@ export function GuardianProvider({ children }: PropsWithChildren) {
     return () => abort.abort();
   }, [client, profileId, signedIn, tick]);
 
-  // 3) 서버 설정을 이 기기 설정으로 옮긴다(아이 화면이 읽는 값). 같은 값이면 건너뛴다.
+  // 3) 별도의 로컬 화면 상태를 만들지 않고 공유 캐시를 갱신한다.
   useEffect(() => {
     if (!settings) return;
-    const next = toLocalSettings(settings);
-    const stamp = JSON.stringify(next);
-    if (syncedSettings.current === stamp) return;
-    syncedSettings.current = stamp;
-    update((previous) => ({ ...previous, settings: { ...previous.settings, ...next } }));
-  }, [settings, update]);
+    void cache.invalidateQueries({ queryKey: ['server'] });
+  }, [settings, cache]);
 
   const profile = useMemo(
     () => profiles.find((item) => item.id === profileId) ?? null,

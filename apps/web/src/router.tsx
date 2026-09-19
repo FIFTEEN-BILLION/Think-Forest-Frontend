@@ -2,7 +2,7 @@ import { createBrowserRouter } from 'react-router-dom';
 import { VillageRoot } from '@jjcp/app/screens';
 import { NotFoundScreen } from '@jjcp/app/screens/NotFoundScreen';
 
-// main 의 묶음 모듈을 그대로 쓴다. 본문은 API v1 판 화면이 들고 있다.
+// 실제 API와 목데이터는 동일한 화면을 사용한다.
 const readers = () => import('@jjcp/app/screens/ReaderScreens');
 const learning = () => import('@jjcp/app/screens/LearningScreens');
 const parents = () => import('@jjcp/app/screens/ParentScreens');
@@ -25,17 +25,8 @@ export const router = createBrowserRouter([
     children: [
       { index: true, lazy: async () => ({ Component: (await readers()).ServerHome }) },
       { path: 'login', lazy: async () => ({ Component: (await login()).LoginScreen }) },
-      {
-        // 서버 대화(티키와 첫인사·티키와 이야기)만 로그인이 필요하다.
-        lazy: async () => ({ Component: (await login()).RequireAuth }),
-        children: [
-          { path: 'talk', lazy: async () => ({ Component: (await learning()).ServerTalk }) },
-          {
-            path: 'first-talk',
-            lazy: async () => ({ Component: (await learning()).ServerFirstTalk }),
-          },
-        ],
-      },
+      { path: 'talk', lazy: async () => ({ Component: (await learning()).ServerTalk }) },
+      { path: 'first-talk', lazy: async () => ({ Component: (await learning()).ServerFirstTalk }) },
       ...['adventures', 'adventures/:track', 'adventures/:track/:activityId'].map((path) => ({
         path,
         lazy: async () => ({ Component: (await learning()).ServerAdventures }),
@@ -46,12 +37,12 @@ export const router = createBrowserRouter([
       },
       { path: 'shelf', lazy: async () => ({ Component: (await readers()).ServerLibrary }) },
       { path: 'shelf/:id', lazy: async () => ({ Component: (await readers()).ServerRecord }) },
-      { path: 'complete/:id', lazy: async () => ({ Component: (await readers()).ServerComplete }) },
+      { path: 'complete/:id', lazy: async () => ({ Component: (await readers()).ServerRecord }) },
       { path: 'words', lazy: async () => ({ Component: (await readers()).ServerWords }) },
       { path: 'community', lazy: async () => ({ Component: (await readers()).ServerCommunity }) },
       {
         path: 'community/:id',
-        lazy: async () => ({ Component: (await readers()).ServerCommunityStory }),
+        lazy: async () => ({ Component: (await readers()).ServerCommunity }),
       },
       { path: 'story-share', lazy: async () => ({ Component: (await readers()).ServerShare }) },
       { path: 'topics/new', lazy: async () => ({ Component: (await readers()).ServerTopics }) },

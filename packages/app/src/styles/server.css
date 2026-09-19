@@ -1,36 +1,8 @@
-.server-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.7rem 1rem;
-  margin-bottom: 1.5rem;
-  background: var(--paper-1);
-  color: var(--ink-900);
-  border-radius: 12px;
-  font-size: 0.85rem;
-}
-.server-status button {
-  text-decoration: underline;
-}
 .server-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
   gap: 1.2rem;
   margin: 1.2rem 0 2rem;
-}
-.server-card {
-  display: block;
-  text-decoration: none;
-  color: inherit;
-  transition: transform 0.15s;
-}
-.server-card:hover {
-  transform: translateY(-3px);
-}
-.server-card h2,
-.server-card h3 {
-  line-height: 1.4;
 }
 .server-detail {
   max-width: 860px;
@@ -80,13 +52,6 @@
   position: relative;
   box-shadow: 0 5px 28px #0000000d;
 }
-.server-review {
-  border-top: 1px solid var(--line);
-  padding: 1.2rem 0;
-}
-.server-number {
-  font-size: 2.5rem;
-}
 .server-welcome {
   display: grid;
   gap: 20px;
@@ -116,8 +81,7 @@
 }
 .server-detail label,
 .server-composer label,
-.panel form label,
-.server-review label {
+.panel form label {
   display: block;
   margin: 0.8rem 0;
 }
@@ -162,9 +126,6 @@
   }
 }
 @media (max-width: 600px) {
-  .server-status {
-    flex-wrap: wrap;
-  }
   .server-composer {
     position: static;
   }
@@ -309,17 +270,115 @@
   font-size: 13px;
 }
 .server-chat .server-composer {
-  display: block;
+  display: grid;
+  gap: 20px;
+  min-width: 0;
   min-height: 0;
   padding: 24px;
   background: var(--paper-1);
   border-top: 1px solid var(--line);
   border-radius: 0;
   margin: 0;
+  box-shadow: none;
 }
-.server-chat .server-composer .row {
-  margin-top: 18px;
+.server-chat .composer-field {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  min-width: 0;
+  font-weight: 700;
+  text-align: left;
+}
+.server-chat .composer-field textarea {
+  display: block;
+  min-height: 112px;
+  margin: 0;
+  font-weight: 400;
+}
+.server-chat .composer-tools {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
   flex-wrap: wrap;
+}
+.server-chat .composer-tools .voice-input {
+  flex: 1 1 360px;
+  min-width: 0;
+  margin: 0;
+  gap: 10px;
+}
+.server-chat .composer-tools .btn,
+.server-chat .composer-tools .choice-control {
+  min-height: 48px;
+  padding: 10px 14px;
+  font-size: 15px;
+  border-radius: 14px;
+}
+.server-chat .composer-tools .voice-input > p,
+.server-chat .composer-tools .voice-input > small {
+  flex-basis: 100%;
+  margin: 0;
+  line-height: 1.6;
+}
+.server-chat .composer-send {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+.server-chat .composer-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.server-chat .composer-choices .chip {
+  flex: 1 1 180px;
+  min-height: 48px;
+  padding: 12px 16px;
+}
+.server-chat .composer-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.server-chat .composer-progress {
+  display: grid;
+  gap: 8px;
+  flex: 1 1 160px;
+  max-width: 220px;
+  font-size: 14px;
+  color: var(--ink-500);
+}
+.server-chat .composer-progress strong {
+  margin-left: 6px;
+  color: var(--teal);
+}
+.server-chat .composer-progress .session-progress {
+  width: 100%;
+  margin: 0;
+}
+.server-chat .composer-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.server-chat .composer-session-actions .btn {
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 14px;
+  border-radius: 12px;
+}
+.server-chat .composer-session-actions .composer-cancel {
+  color: var(--ink-500);
+  background: transparent;
+  border-color: transparent;
+}
+.server-chat .composer-cancel:hover:not(:disabled) {
+  background: var(--paper-0);
+  border-color: var(--line);
 }
 .server-chat .first-chat {
   min-width: 0;
@@ -556,9 +615,6 @@
   flex: none;
   margin: 0;
 }
-.api-page .book-body .choice-control {
-  width: 100%;
-}
 .api-page .book-cover {
   display: block;
   height: auto;
@@ -567,6 +623,196 @@
 }
 .api-page .book-cover h3 {
   max-width: 100%;
+}
+.api-page .library-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 42px 0 18px;
+}
+.api-page .library-section-head h2,
+.api-page .library-section-head p {
+  margin: 0;
+}
+.api-page .library-section-head h2 {
+  font-size: 25px;
+}
+.api-page .library-section-head p {
+  margin-top: 6px;
+  color: var(--ink-500);
+}
+.api-page .library-section-head > span {
+  flex: none;
+  color: var(--teal);
+  font-size: 14px;
+  font-weight: 750;
+}
+.api-page .cards.books.library-story-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr));
+  gap: 20px;
+}
+.api-page .library-story-grid .book {
+  display: flex;
+  flex-direction: column;
+}
+.api-page .library-story-grid .book-cover {
+  min-height: 190px;
+  padding: 24px 24px 68px;
+}
+.api-page .library-story-grid .book-cover h3 {
+  font-size: clamp(22px, 2vw, 27px);
+}
+.api-page .library-story-grid .book-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 22px;
+}
+.api-page .library-story-grid .book-body > p {
+  min-height: 72px;
+  margin: 14px 0 18px;
+  font-size: 15px;
+  line-height: 1.75;
+}
+.api-page .library-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.api-page .library-favorite {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 36px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  color: var(--ink-500);
+  font-size: 13px;
+  font-weight: 700;
+}
+.api-page .library-favorite[aria-pressed='true'] {
+  color: var(--teal);
+  background: var(--teal-soft);
+}
+.api-page .library-story-grid .book-body > .btn {
+  margin-top: auto;
+}
+.api-page .library-story-grid .library-book-toggle {
+  width: 100%;
+  margin: 10px 0 0;
+  border-radius: 12px;
+}
+.api-page .library-builder {
+  margin-top: 48px;
+  padding: 30px;
+}
+.api-page .library-builder-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 26px;
+}
+.api-page .library-builder-head :where(h2, p) {
+  margin: 0;
+}
+.api-page .library-builder-head h2 {
+  margin-top: 6px;
+  font-size: 27px;
+}
+.api-page .library-builder-head p {
+  margin-top: 7px;
+  color: var(--ink-500);
+}
+.api-page .library-selection-count {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-size: 14px;
+  font-weight: 750;
+}
+.api-page .library-builder-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 0.9fr);
+  gap: 32px;
+}
+.api-page .library-builder-form,
+.api-page .library-created-books {
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--paper-0);
+}
+.api-page .library-builder-form label {
+  margin: 0;
+  font-weight: 700;
+}
+.api-page .library-builder-form input {
+  margin-top: 9px;
+}
+.api-page .library-builder-form > .btn {
+  width: 100%;
+  margin-top: 16px;
+}
+.api-page .library-created-books h3 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+.api-page .library-book-list {
+  display: grid;
+  gap: 10px;
+}
+.api-page .library-book-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-1);
+  text-align: left;
+}
+.api-page .library-book-row:hover {
+  border-color: var(--teal);
+}
+.api-page .library-book-row > span:nth-child(2) {
+  min-width: 0;
+}
+.api-page .library-book-row strong,
+.api-page .library-book-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.api-page .library-book-row small,
+.api-page .library-book-empty {
+  margin-top: 4px;
+  color: var(--ink-500);
+  font-size: 13px;
+}
+.api-page .library-book-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+.api-page .library-book-icon .icon {
+  width: 21px;
+  height: 21px;
+}
+.api-page .library-created-books .pagination {
+  margin-bottom: 0;
 }
 .api-page .server-prose {
   overflow-wrap: anywhere;
@@ -670,11 +916,26 @@
   .server-chat .server-composer textarea {
     min-height: 110px;
   }
-  .server-chat .voice-input > .btn,
-  .server-chat .voice-input .choice-control,
-  .server-chat .server-composer > .btn {
+  .server-chat .composer-tools {
+    flex-direction: column;
+  }
+  .server-chat .composer-tools .voice-input {
+    flex-basis: auto;
     width: 100%;
+  }
+  .server-chat .composer-tools .voice-input > .btn,
+  .server-chat .composer-tools .voice-input .choice-control {
+    flex: 1 1 180px;
     min-width: 0;
+  }
+  .server-chat .composer-send,
+  .server-chat .composer-progress,
+  .server-chat .composer-session-actions {
+    width: 100%;
+    max-width: none;
+  }
+  .server-chat .composer-session-actions > .btn {
+    flex: 1 1 140px;
   }
   .api-page .server-detail > .row > .btn {
     flex: 1 1 180px;
@@ -684,6 +945,41 @@
   }
   .api-page .choice-control--switch {
     padding: 12px;
+  }
+  .api-page .library-section-head {
+    align-items: flex-start;
+    margin-top: 32px;
+  }
+  .api-page .library-section-head p {
+    display: none;
+  }
+  .api-page .library-story-grid .book-cover {
+    min-height: 170px;
+  }
+  .api-page .library-story-grid .book-body {
+    padding: 20px 18px;
+  }
+  .api-page .library-builder {
+    margin-top: 34px;
+    padding: 22px 18px;
+  }
+  .api-page .library-builder-head,
+  .api-page .library-builder-grid {
+    grid-template-columns: 1fr;
+  }
+  .api-page .library-builder-head {
+    display: grid;
+    gap: 12px;
+  }
+  .api-page .library-selection-count {
+    justify-self: start;
+  }
+  .api-page .library-builder-grid {
+    gap: 16px;
+  }
+  .api-page .library-builder-form,
+  .api-page .library-created-books {
+    padding: 18px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

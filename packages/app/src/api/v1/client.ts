@@ -187,6 +187,7 @@ export function createV1Client(options: V1ClientOptions = {}) {
 
   return {
     baseUrl,
+    fetch: doFetch,
     request,
     refresh,
     getSession: () => session,

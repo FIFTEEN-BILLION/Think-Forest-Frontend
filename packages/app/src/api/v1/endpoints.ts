@@ -804,7 +804,7 @@ async function rawRequest(
 ): Promise<Response> {
   const url = `${client.baseUrl}${path}`;
   const call = (token: string | null) =>
-    fetch(url, {
+    client.fetch(url, {
       method: init.method,
       headers: {
         Accept: init.accept ?? 'application/json',

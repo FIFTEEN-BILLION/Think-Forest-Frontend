@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { ChoiceControl } from './ChoiceControl';
+import { Icon } from './Icon';
 import { useEffect, useRef, useState } from 'react';
 import { errorMessage, json } from '../api/requestOptions';
 import { useBackend } from '../providers/BackendProvider';
@@ -19,11 +20,11 @@ export function VoiceInput({
   onText: (text: string) => void;
   disabled?: boolean;
 }) {
-  const { request, profileId } = useBackend();
+  const { request, profileId, useApi } = useBackend();
   const settings = useServerQuery<Model<'SettingsResponse'>>(
     profileId ? `profiles/${profileId}/settings` : null,
   );
-  const voiceDisabled = settings.data?.settings.voiceEnabled === false;
+  const voiceDisabled = !useApi || settings.data?.settings.voiceEnabled === false;
   const apiUrl = useApiUrl();
   const [active, setActive] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -285,10 +286,12 @@ export function VoiceInput({
   return (
     <div className="voice-input">
       <button
+        type="button"
         className="btn light"
         disabled={pending || ((voiceDisabled || disabled) && !active)}
         onClick={() => void begin()}
       >
+        <Icon name={active ? 'pause' : 'mic'} />
         {active ? '녹음 마치기' : pending ? '음성을 처리하고 있어요…' : '마이크로 입력'}
       </button>
       <ChoiceControl
@@ -302,7 +305,13 @@ export function VoiceInput({
         <p role="status">듣고 있어요{live ? ' · 인식되는 글자를 입력란에 표시해요.' : '…'}</p>
       )}
       {failure && <p role="alert">{failure}</p>}
-      {voiceDisabled && <p>보호자 설정에서 음성 사용이 꺼져 있어요. 글로 입력해 주세요.</p>}
+      {voiceDisabled && (
+        <p>
+          {useApi
+            ? '보호자 설정에서 음성 사용이 꺼져 있어요. 글로 입력해 주세요.'
+            : '예시 체험에서는 글로 대화해 주세요.'}
+        </p>
+      )}
       <small>
         말을 마치고 1.5초 쉬면 자동으로 녹음을 마쳐요. 인식한 문장을 확인하고 보내 주세요.
       </small>

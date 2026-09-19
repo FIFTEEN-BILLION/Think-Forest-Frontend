@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect } from 'react';
 import type { PropsWithChildren } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useApiClient } from '../api/ApiClientProvider';
@@ -11,6 +11,7 @@ import { useAuth } from './AuthProvider';
 
 type Request = <T>(path: string, options?: RequestInit) => Promise<T>;
 interface Backend {
+  useApi: boolean;
   devLoginEnabled: boolean;
   me: Me | null;
   loading: boolean;
@@ -29,27 +30,30 @@ const Context = createContext<Backend | null>(null);
 export function BackendProvider({
   children,
   devLoginEnabled = false,
-}: PropsWithChildren<{ devLoginEnabled?: boolean }>) {
+  useApi = true,
+}: PropsWithChildren<{ devLoginEnabled?: boolean; useApi?: boolean }>) {
   const api = useApiClient();
   const cache = useQueryClient();
-  const auth = useAuth();
+  const { client, status, loginAsDev, logout: authLogout } = useAuth();
+  useEffect(() => {
+    if (status === 'signedOut') void replaceAccount(cache, null);
+  }, [cache, status]);
   // 세션은 AuthProvider 의 v1 클라이언트 하나만 갖는다. 여기서 또 refresh 하면
   // 서버가 refresh 토큰을 돌려 발급할 때 서로의 세션을 끊는다.
-  const token = useRef(auth.client.getSession()?.accessToken ?? '');
   const renew = useCallback(async () => {
-    const session = await auth.client.refresh();
+    const session = await client.refresh();
     if (!session) {
-      token.current = '';
       throw new ApiError(401, '{"error":{"code":"UNAUTHORIZED"}}');
     }
-    token.current = session.accessToken;
     return session.accessToken;
-  }, [auth]);
+  }, [client]);
   const request = useCallback<Request>(
     async <T,>(path: string, options: RequestInit = {}) => {
+      const usedToken = client.getSession()?.accessToken;
       const perform = () => {
         const headers = new Headers(options.headers);
-        if (token.current) headers.set('Authorization', `Bearer ${token.current}`);
+        const token = client.getSession()?.accessToken;
+        if (token) headers.set('Authorization', `Bearer ${token}`);
         return api<T>(`api/v1/${path.replace(/^\//, '')}`, {
           ...options,
           headers,
@@ -66,10 +70,9 @@ export function BackendProvider({
         )
           throw error;
         try {
-          await renew();
+          if (!client.getSession() || client.getSession()?.accessToken === usedToken) await renew();
         } catch (refreshError) {
           if (refreshError instanceof ApiError && refreshError.status === 401) {
-            token.current = '';
             await replaceAccount(cache, null);
           }
           throw refreshError;
@@ -77,16 +80,15 @@ export function BackendProvider({
         return perform();
       }
     },
-    [api, cache, renew],
+    [api, cache, client, renew],
   );
   const account = useQuery<Me | null>({
     queryKey: serverKeys.me,
-    enabled: auth.status !== 'loading',
+    enabled: status !== 'loading',
     queryFn: async () => {
-      if (auth.status === 'signedOut') return null;
-      token.current = auth.client.getSession()?.accessToken ?? token.current;
+      if (status === 'signedOut') return null;
       try {
-        if (!token.current) await renew();
+        if (!client.getSession()) await renew();
         return await request<Me>('me');
       } catch (error) {
         if (error instanceof ApiError && error.status === 401) return null;
@@ -109,8 +111,7 @@ export function BackendProvider({
     mutationKey: ['auth', 'login'],
     mutationFn: async () => {
       // 개발용 로그인도 v1 클라이언트를 거쳐야 세션이 한 벌로 유지된다.
-      await auth.loginAsDev('새싹');
-      token.current = auth.client.getSession()?.accessToken ?? '';
+      await loginAsDev('새싹');
       return await request<Me>('me');
     },
     onSuccess: async (me) => {
@@ -119,9 +120,8 @@ export function BackendProvider({
   });
   const logout = useMutation({
     mutationKey: ['auth', 'logout'],
-    mutationFn: () => auth.logout(),
+    mutationFn: () => authLogout(),
     onSuccess: async () => {
-      token.current = '';
       await replaceAccount(cache, null);
       login.reset();
     },
@@ -130,10 +130,10 @@ export function BackendProvider({
   return (
     <Context.Provider
       value={{
+        useApi,
         devLoginEnabled,
-        me: account.data ?? null,
-        loading:
-          auth.status === 'loading' || account.isPending || login.isPending || logout.isPending,
+        me: status === 'signedIn' ? (account.data ?? null) : null,
+        loading: status === 'loading' || account.isPending || login.isPending || logout.isPending,
         error: failure ? errorMessage(failure) : '',
         profileId:
           account.data?.profiles.find((p) => p.isDefault)?.id ?? account.data?.profile?.id ?? '',

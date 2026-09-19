@@ -1,5 +1,22 @@
 # API v1 기능을 main 구조 위로 옮긴 기록
 
+## 통합 화면 브랜치와의 병합 (2026-09-19)
+
+아래 본문은 main에 이식했을 당시의 기록이다. `feat/hyunsu-frontend`에 main
+`daae667`을 병합한 현재 구조는 다음과 같다.
+
+- ReaderScreens·LearningScreens·ActivityScreens·ParentScreens의 통합 화면을 유지한다.
+  삭제된 개별 화면과 그 전용 컴포넌트, VillageProvider는 되살리지 않는다.
+- `VITE_USE_API=false`는 같은 화면에 목데이터를 제공한다. 새 보호자 화면과
+  AuthProvider도 주입된 요청 경로를 공유하여 목 모드에서 네트워크로 우회하지 않는다.
+- main의 API v1 엔드포인트·타입·테스트, 보호자 전용 경로, 알림, 음성 모듈과
+  네이티브 브리지를 반영한다. 기존 대화 화면의 VoiceInput은 유지한다.
+- AuthProvider가 인증 세션과 갱신을 소유하고, BackendProvider는 같은 세션을 이용한다.
+  전체 화면의 BackendGate와 프로필 전환 시 재마운트 정책도 유지한다.
+- 전역 계정 저장 안내·로그아웃 배너 및 정리된 미사용 스타일은 복원하지 않는다.
+
+---
+
 `origin/main` 의 뼈대·인프라를 그대로 두고 `origin/develop` 의 JJCP API v1 기능 전부를 얹었다.
 두 갈래는 `78d0123` 에서 갈라졌다. main 은 한 명이 화면을 통째로 다시 쓴 갈래(`99a5422`),
 develop 은 API v1 기능 30 커밋이다.

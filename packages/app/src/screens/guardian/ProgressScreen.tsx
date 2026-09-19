@@ -21,6 +21,7 @@ import {
   useGuardian,
 } from '../../components/GuardianParts';
 import { Button, Notice } from '../../components/ui';
+import { ProgressChart } from '../../components/ProgressChart';
 
 const PERIODS = [
   ['7d', '최근 7일'],
@@ -43,25 +44,20 @@ const BEHAVIOR_LABELS: [keyof ProgressReport['observedBehaviors'], string][] = [
 ];
 
 function Timeline({ report }: { report: ProgressReport }) {
-  const max = Math.max(1, ...report.timeline.map((point) => point.responses));
   if (report.timeline.length === 0)
     return <p className="muted space-top">아직 이 기간에 기록이 없어요.</p>;
   return (
-    <div className="rubric">
-      {report.timeline.map((point) => (
-        <div className="rubric-row" key={point.date}>
-          <span>{point.date.slice(5)}</span>
-          <div className="bar">
-            <span
-              style={{ width: `${(point.responses / max) * 100}%`, background: 'var(--teal)' }}
-            />
-          </div>
-          <span>
-            {point.responses}번 · 이야기 {point.completedStories}편
-          </span>
-        </div>
-      ))}
-    </div>
+    <>
+      <ProgressChart points={report.timeline} />
+      <details>
+        <summary>날짜별 기록 자세히 보기</summary>
+        {report.timeline.map((point) => (
+          <p key={point.date}>
+            {point.date}: 답변 {point.responses}번 · 이야기 {point.completedStories}편
+          </p>
+        ))}
+      </details>
+    </>
   );
 }
 

@@ -1,11 +1,14 @@
 import { Suspense, useEffect, useRef, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation } from 'react-router-dom';
-import { useAuth } from '../providers/AuthProvider';
-import { VillageProvider, useVillage } from '../providers/VillageProvider';
-import { NotificationBell } from './NotificationBell';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { Icon } from './Icon';
 import { Notice } from './ui';
 import type { Theme } from '../types/village';
+import { useBackend } from '../providers/BackendProvider';
+import { BackendGate } from './BackendGate';
+import { NotificationBell } from './NotificationBell';
+import { useServerQuery, useAction } from '../hooks/useServerApi';
+import { json } from '../api/requestOptions';
+import type { Model } from '../api/schema';
 const navigation = [
   { to: '/', label: '오늘의 이야기', icon: 'home' },
   { to: '/shelf', label: '나의 책장', icon: 'book' },
@@ -14,38 +17,44 @@ const navigation = [
   { to: '/report', label: '나의 발자국', icon: 'chart' },
 ];
 export function VillageRoot() {
-  return (
-    <VillageProvider>
-      <AppLayout />
-    </VillageProvider>
+  const backend = useBackend();
+  const navigate = useNavigate();
+  const themeAction = useAction();
+  const profileAction = useAction();
+  const settings = useServerQuery<Model<'SettingsResponse'>>(
+    backend.profileId ? `profiles/${backend.profileId}/settings` : null,
   );
-}
-function AppLayout() {
-  const { data, update, storageError, message } = useVillage();
-  const { status, logout } = useAuth();
-  const signedIn = status === 'signedIn';
+  const profiles = useServerQuery<Model<'ProfileListResponse'>>('profiles');
+  const theme = (settings.data?.settings.theme.toLowerCase() ?? 'auto') as Theme;
+  useEffect(() => {
+    if (theme === 'auto') document.documentElement.removeAttribute('data-theme');
+    else document.documentElement.dataset.theme = theme;
+  }, [theme]);
+  const selectedProfile = profiles.data?.items.find((p) => p.id === backend.profileId);
+  const displayName = selectedProfile?.nickname || backend.me?.profile?.nickname || '새싹';
   const [menu, setMenu] = useState(false);
   const location = useLocation();
   const sidebar = useRef<HTMLElement>(null);
-  const title =
-    location.pathname === '/session/lab' && data.resume?.activityId === 'first-inquiry'
-      ? '첫 탐구'
-      : location.pathname === '/session/lab' && data.resume?.activityId === 'path-teaching'
-        ? '티키 가르치기'
+  const title = location.pathname.startsWith('/guardian/')
+    ? '보호자 공간'
+    : location.pathname.startsWith('/first-talk')
+      ? '티키와 첫 인사'
+      : location.pathname.startsWith('/talk')
+        ? '티키와 대화하기'
         : location.pathname.startsWith('/login')
           ? '로그인'
-          : location.pathname.startsWith('/first-talk')
-            ? '티키와 첫 인사'
-            : location.pathname.startsWith('/talk')
-              ? '티키와 대화하기'
-              : location.pathname.startsWith('/topics/new')
-                ? '내가 주제 정하기'
-                : location.pathname.startsWith('/story-share')
-                  ? '내 이야기 공유하기'
-                  : location.pathname.startsWith('/profile')
-                    ? '내 프로필과 설정'
-                    : location.pathname.startsWith('/data')
-                      ? '내 기록 관리'
+          : location.pathname.startsWith('/topics/new')
+            ? '내가 주제 정하기'
+            : location.pathname.startsWith('/story-share')
+              ? '내 이야기 공유하기'
+              : location.pathname.startsWith('/profile')
+                ? '내 프로필과 설정'
+                : location.pathname.startsWith('/data')
+                  ? '내 기록 관리'
+                  : location.pathname.startsWith('/tech')
+                    ? '티키와 기록 안내'
+                    : /^\/(adventures|session)/.test(location.pathname)
+                      ? '생각 모험'
                       : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))
                           ?.label ?? '오늘의 이야기');
   useEffect(() => {
@@ -85,10 +94,17 @@ function AppLayout() {
   }, [menu]);
   const cycleTheme = () => {
     const themes: Theme[] = ['auto', 'light', 'dark'];
-    update((p) => ({
-      ...p,
-      settings: { ...p.settings, theme: themes[(themes.indexOf(p.settings.theme) + 1) % 3]! },
-    }));
+    if (settings.data && backend.profileId)
+      void themeAction.run(async () => {
+        await backend.request(
+          `profiles/${backend.profileId}/settings`,
+          json(
+            { theme: themes[(themes.indexOf(theme) + 1) % 3]!.toUpperCase() },
+            'PATCH',
+            settings.data!.settings.version,
+          ),
+        );
+      });
   };
   return (
     <>
@@ -125,7 +141,7 @@ function AppLayout() {
         >
           <Icon name="close" />
         </button>
-        <div className="nav-caption">{data.profile.name || '나'}의 생각 놀이터</div>
+        <div className="nav-caption">{displayName}의 생각 놀이터</div>
         <nav className="nav">
           {navigation.map((n) => (
             <NavLink
@@ -146,19 +162,22 @@ function AppLayout() {
         </nav>
         <div className="side-bottom">
           <div className="seed-note">
-            <strong>{signedIn ? '오늘도 티키가 기다려요!' : '티키와 이야기해 볼까요?'}</strong>
+            <strong>작은 생각도 소중해요.</strong>
             <p>
-              {signedIn ? '이야기를 마치면 책장에 담겨요.' : '로그인하면 이야기가 책장에 저장돼요.'}
+              떠오른 생각을 하나씩
+              <br />
+              티키에게 들려주세요.
             </p>
           </div>
           <Link to="/profile" className="child-card" onClick={() => setMenu(false)}>
-            <span className="avatar">{data.profile.name.slice(0, 1)}</span>
+            <span className="avatar">{displayName.slice(0, 1)}</span>
             <span>
-              <strong>{data.profile.name}의 작은 마을</strong>
-              <small>{data.profile.grade}</small>
+              <strong>{displayName}의 작은 마을</strong>
+              <small>
+                {selectedProfile?.gradeOrAgeBand ?? backend.me?.profile?.gradeOrAgeBand ?? ''}
+              </small>
             </span>
           </Link>
-          {/* main 의 사이드 바로가기. 기록 관리·안내는 메뉴에서도 바로 열 수 있어야 한다. */}
           <div className="side-utility">
             <Link to="/data" onClick={() => setMenu(false)}>
               내 기록 관리
@@ -166,17 +185,6 @@ function AppLayout() {
             <Link to="/tech" onClick={() => setMenu(false)}>
               티키 안내
             </Link>
-            {signedIn && (
-              <button
-                type="button"
-                onClick={() => {
-                  setMenu(false);
-                  void logout();
-                }}
-              >
-                로그아웃
-              </button>
-            )}
           </div>
           <span className="status">안전한 어린이 모드</span>
         </div>
@@ -207,22 +215,51 @@ function AppLayout() {
             </div>
           </div>
           <div className="top-actions">
-            <span className="status">{signedIn ? '티키 서버 연결됨' : '로그인 전'}</span>
-            {signedIn && <NotificationBell />}
+            {!!profiles.data?.items.filter((p) => p.role === 'OWNER').length && (
+              <select
+                className="profile-switcher"
+                aria-label="아이 프로필"
+                value={backend.profileId}
+                disabled={profileAction.busy}
+                onChange={(e) => {
+                  const profile = profiles.data?.items.find((p) => p.id === e.target.value);
+                  if (profile)
+                    void profileAction.run(async () => {
+                      await backend.request(
+                        `profiles/${profile.id}`,
+                        json({ makeDefault: true }, 'PATCH', profile.version),
+                      );
+                      await backend.refreshMe();
+                      navigate('/');
+                    });
+                }}
+              >
+                {profiles.data?.items
+                  .filter((p) => p.role === 'OWNER')
+                  .map((p) => (
+                    <option value={p.id} key={p.id}>
+                      {p.nickname || '첫인사 전 아이'}
+                    </option>
+                  ))}
+              </select>
+            )}
+            <span className="status">{backend.me ? '내 기록' : '함께 시작해요'}</span>
+            <NotificationBell key={backend.scopeId} />
             <button
               className="icon-btn"
               onClick={cycleTheme}
-              aria-label={`화면 테마 변경, 현재 ${{ auto: '기기 설정', light: '라이트', dark: '다크' }[data.settings.theme]}`}
+              disabled={!settings.data || themeAction.busy}
+              aria-label={`화면 테마 변경, 현재 ${{ auto: '기기 설정', light: '라이트', dark: '다크' }[theme]}`}
             >
-              <Icon name={data.settings.theme === 'dark' ? 'sun' : 'moon'} />
+              <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
             </button>
             <Link className="avatar" to="/profile" aria-label="아이 프로필 열기">
-              {data.profile.name.slice(0, 1)}
+              {displayName.slice(0, 1)}
             </Link>
           </div>
         </header>
         <main id="main" tabIndex={-1}>
-          {storageError && <Notice variant="error">{storageError}</Notice>}
+          {themeAction.message && <Notice variant="error">{themeAction.message}</Notice>}
           <Suspense
             fallback={
               <div className="panel loading-page" role="status">
@@ -231,19 +268,22 @@ function AppLayout() {
               </div>
             }
           >
-            <Outlet />
+            <BackendGate>
+              <div className="api-page" key={backend.scopeId}>
+                <Outlet />
+              </div>
+            </BackendGate>
           </Suspense>
           <footer className="footer">
             <span>작은 질문이 모여, 단단한 생각이 되는 곳.</span>
             <Link to="/tech">
-              {signedIn ? '연결 상태와 안전 안내 보기' : '이 기기에만 저장돼요'}{' '}
-              <Icon name="arrow" />
+              티키와 기록 안내 <Icon name="arrow" />
             </Link>
           </footer>
         </main>
       </div>
       <div className="toast" role="status" aria-live="polite">
-        {message}
+        {profileAction.message}
       </div>
     </>
   );

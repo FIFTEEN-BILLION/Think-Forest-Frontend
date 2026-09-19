@@ -8,8 +8,15 @@ import type { ApiRequest } from './client';
 const ApiClientContext = createContext<ApiRequest | null>(null);
 const ApiBaseContext = createContext('');
 
-export function ApiClientProvider({ baseUrl, children }: PropsWithChildren<{ baseUrl: string }>) {
-  const request = useMemo(() => createApiClient(baseUrl), [baseUrl]);
+export function ApiClientProvider({
+  baseUrl,
+  request: suppliedRequest,
+  children,
+}: PropsWithChildren<{ baseUrl: string; request?: ApiRequest }>) {
+  const request = useMemo(
+    () => suppliedRequest ?? createApiClient(baseUrl),
+    [baseUrl, suppliedRequest],
+  );
   return (
     <ApiBaseContext.Provider value={baseUrl}>
       <ApiClientContext.Provider value={request}>{children}</ApiClientContext.Provider>

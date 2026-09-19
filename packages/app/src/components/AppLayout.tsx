@@ -4,7 +4,7 @@ import { Icon } from './Icon';
 import { Notice } from './ui';
 import type { Theme } from '../types/village';
 import { useBackend } from '../providers/BackendProvider';
-import { BackendGate, BackendStatus } from './BackendGate';
+import { BackendGate } from './BackendGate';
 import { useServerQuery, useAction } from '../hooks/useServerApi';
 import { json } from '../api/requestOptions';
 import type { Model } from '../api/schema';
@@ -255,7 +255,6 @@ export function VillageRoot() {
           </div>
         </header>
         <main id="main" tabIndex={-1}>
-          <BackendStatus />
           {themeAction.message && <Notice variant="error">{themeAction.message}</Notice>}
           <Suspense
             fallback={

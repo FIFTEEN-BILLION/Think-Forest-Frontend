@@ -22,13 +22,19 @@ export function LoginScreen() {
         <p role="status">로그인 정보를 확인하고 있어요…</p>
       ) : (
         <>
-          <a
-            className="btn kakao-login"
-            href={apiUrl(`api/v1/auth/kakao/authorize?returnTo=${encodeURIComponent(callback)}`)}
-          >
-            카카오로 시작
-          </a>
-          {local && backend.devLoginEnabled && (
+          {!backend.useApi ? (
+            <button className="btn" onClick={() => void backend.login()}>
+              예시 데이터로 시작
+            </button>
+          ) : (
+            <a
+              className="btn kakao-login"
+              href={apiUrl(`api/v1/auth/kakao/authorize?returnTo=${encodeURIComponent(callback)}`)}
+            >
+              카카오로 시작
+            </a>
+          )}
+          {backend.useApi && local && backend.devLoginEnabled && (
             <>
               <p className="muted">
                 로컬 테스트 환경 · 실제 아동 정보 대신 가상의 정보를 입력해 주세요.

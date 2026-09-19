@@ -321,6 +321,7 @@ function TalkSession({ greeting }: { greeting: boolean }) {
                       disabled={
                         reading.busy ||
                         action.busy ||
+                        !backend.useApi ||
                         voiceSettings.data?.settings.ttsEnabled === false ||
                         voiceSettings.data?.settings.voiceEnabled === false
                       }

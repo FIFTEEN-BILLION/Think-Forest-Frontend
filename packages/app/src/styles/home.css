@@ -238,14 +238,6 @@
     transform 0.18s ease,
     box-shadow 0.18s ease;
 }
-.home-question-card.sky {
-  background: #eef4fb;
-  border-color: #d9e5ef;
-}
-.home-question-card.lavender {
-  background: #f4effa;
-  border-color: #e3dbee;
-}
 .home-question-card:hover,
 .home-friend-card:hover {
   transform: translateY(-3px);

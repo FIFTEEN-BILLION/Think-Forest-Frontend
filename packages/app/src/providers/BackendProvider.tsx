@@ -10,6 +10,7 @@ import type { Me, Token } from '../types/backend';
 
 type Request = <T>(path: string, options?: RequestInit) => Promise<T>;
 interface Backend {
+  useApi: boolean;
   devLoginEnabled: boolean;
   me: Me | null;
   loading: boolean;
@@ -28,7 +29,8 @@ const Context = createContext<Backend | null>(null);
 export function BackendProvider({
   children,
   devLoginEnabled = false,
-}: PropsWithChildren<{ devLoginEnabled?: boolean }>) {
+  useApi = true,
+}: PropsWithChildren<{ devLoginEnabled?: boolean; useApi?: boolean }>) {
   const api = useApiClient();
   const cache = useQueryClient();
   // Credentials remain in memory, outside both the query cache and browser storage.
@@ -145,6 +147,7 @@ export function BackendProvider({
   return (
     <Context.Provider
       value={{
+        useApi,
         devLoginEnabled,
         me: account.data ?? null,
         loading: account.isPending || login.isPending || logout.isPending,

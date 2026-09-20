@@ -24,6 +24,7 @@ function load(path) {
 const client = load(resolve(root, 'client.ts'));
 const endpoints = load(resolve(root, 'endpoints.ts'));
 const chat = load(resolve(root, 'chat.ts'));
+const { greetingProcessingNotice } = load(resolve(root, 'greeting.ts'));
 const { createV1Client, parseV1Error, V1Error } = client;
 
 const json = (status, body, headers = {}) =>
@@ -33,6 +34,79 @@ const json = (status, body, headers = {}) =>
   });
 const user = { id: 'usr_1', role: 'CHILD', needsFirstGreeting: true };
 const tokens = (accessToken) => ({ accessToken, expiresIn: 3600, refreshExpiresIn: 2592000, user });
+
+test('guest login uses the public endpoint without sharing a device key or existing bearer token', async () => {
+  const calls = [];
+  const guestUser = { id: 'guest-unique', role: 'GUEST', needsFirstGreeting: false };
+  const client = createV1Client({
+    fetch: async (url, init) => {
+      calls.push({ url, init });
+      return json(200, { ...tokens('guest-token'), user: guestUser });
+    },
+  });
+  client.acceptTokens(tokens('old-token'));
+  await endpoints.guestLogin(client);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].url, /\/auth\/guest$/);
+  assert.equal(calls[0].init.method, 'POST');
+  assert.equal(calls[0].init.credentials, 'same-origin');
+  assert.equal(new Headers(calls[0].init.headers).get('Authorization'), null);
+  assert.deepEqual(JSON.parse(calls[0].init.body), {});
+  assert.deepEqual(client.getSession().user, guestUser);
+});
+
+test('guest entry keeps activity destinations and redirects account-only destinations home', () => {
+  const guest = { role: 'GUEST', needsFirstGreeting: false };
+  for (const path of [
+    '/profile',
+    '/data?tab=export',
+    '/guardian/invite/abc',
+    '/story-share?story=1',
+  ]) {
+    assert.equal(chat.postLoginPath(guest, path), '/');
+  }
+  assert.equal(chat.postLoginPath(guest, '/talk?topic=topic_ice_cup'), '/talk?topic=topic_ice_cup');
+  assert.equal(
+    chat.postLoginPath({ role: 'GUARDIAN', needsFirstGreeting: false }, '/profile'),
+    '/profile',
+  );
+});
+
+test('greeting shows backend AI, fallback and consent status without pretending all turns use AI', () => {
+  assert.equal(greetingProcessingNotice(), null);
+  assert.equal(greetingProcessingNotice({ mode: 'RULES', reason: 'guided_step' }), null);
+  assert.match(greetingProcessingNotice({ mode: 'AI' }), /백엔드 AI/);
+  assert.match(
+    greetingProcessingNotice({ mode: 'RULES', reason: 'child_data_mode_off' }),
+    /보호자 동의/,
+  );
+  assert.match(
+    greetingProcessingNotice({ mode: 'RULES', reason: 'ai_error:timeout' }),
+    /AI 응답을 받지 못/,
+  );
+  assert.match(
+    greetingProcessingNotice({ mode: 'RULES', reason: 'unverified_extraction' }),
+    /확실하지 않은/,
+  );
+});
+
+test('first greeting completion sends the reviewed profile revision', async () => {
+  const calls = [];
+  const client = {
+    request: async (path, options) => {
+      calls.push({ path, ...options });
+      return { status: 'COMPLETED' };
+    },
+  };
+  await endpoints.completeFirstGreeting(client, 'fgs_1', 4, 'confirm-once');
+  assert.deepEqual(calls, [
+    {
+      path: '/first-greeting/sessions/fgs_1/complete',
+      body: { trigger: 'BUTTON', profileRevision: 4 },
+      idempotencyKey: 'confirm-once',
+    },
+  ]);
+});
 const noLock = (_name, task) => task();
 
 /** Mock fetch: routes by path, records calls. */
@@ -216,9 +290,31 @@ test('list endpoints join statuses and normalize page shapes', async () => {
   assert.equal(topics.items[0].id, 'topic_a');
   assert.deepEqual(endpoints.toPage([1, 2], 'x'), { items: [1, 2], nextCursor: null });
   assert.equal(
-    endpoints.kakaoAuthorizeUrl('/login?returnTo=%2Ftalk'),
-    '/api/v1/auth/kakao/authorize?returnTo=%2Flogin%3FreturnTo%3D%252Ftalk',
+    endpoints.kakaoAuthorizeUrl(
+      '/login?returnTo=%2Ftalk',
+      'https://preview.example.com/auth/kakao/callback',
+    ),
+    '/api/v1/auth/kakao/authorize?returnTo=%2Flogin%3FreturnTo%3D%252Ftalk&redirectUri=https%3A%2F%2Fpreview.example.com%2Fauth%2Fkakao%2Fcallback',
   );
+});
+
+test('Kakao code exchange sends code, state and redirectUri then accepts service tokens', async () => {
+  const response = { ...tokens('jat_kakao'), returnTo: '/talk' };
+  const { fetch, calls } = mockFetch(() => json(200, response));
+  const api = createV1Client({ fetch, lock: noLock });
+  const result = await endpoints.exchangeKakaoCode(api, {
+    code: 'authorization-code',
+    state: 'oauth-state',
+    redirectUri: 'http://localhost:5173/auth/kakao/callback',
+  });
+  assert.equal(result.returnTo, '/talk');
+  assert.equal(api.getSession().accessToken, 'jat_kakao');
+  assert.equal(calls[0].path, '/auth/kakao/exchange');
+  assert.deepEqual(calls[0].body, {
+    code: 'authorization-code',
+    state: 'oauth-state',
+    redirectUri: 'http://localhost:5173/auth/kakao/callback',
+  });
 });
 
 // ---------- chat helpers ----------

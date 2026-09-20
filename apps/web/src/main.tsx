@@ -22,7 +22,13 @@ const devLogin =
 
 createRoot(root).render(
   <StrictMode>
-    <AppProviders apiBaseUrl={apiBaseUrl} devLogin={devLogin} request={request} useApi={useApi}>
+    <AppProviders
+      apiBaseUrl={apiBaseUrl}
+      devLogin={devLogin}
+      debugMode={import.meta.env.VITE_DEBUG_MODE === 'true'}
+      request={request}
+      useApi={useApi}
+    >
       <RouterProvider router={router} />
     </AppProviders>
   </StrictMode>,

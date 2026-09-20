@@ -1,3 +1,5 @@
+import type { GreetingProcessing } from '../api/v1/greeting';
+
 export interface ChatMessage {
   id: string;
   role: string;
@@ -19,6 +21,9 @@ export interface ChatSession {
   nextInteraction?: Interaction | null;
   currentInteraction?: Interaction | null;
   readiness: { ready: boolean; progress: number };
+  processing?: GreetingProcessing | null;
+  profileRevision?: number;
+  deferredFields?: string[];
   storyId?: string;
   nextCursor?: string | null;
   topic?: { title: string };
@@ -27,6 +32,8 @@ export interface ChatSession {
     schoolOrGroup: string | null;
     gradeOrAgeBand: string | null;
     interests: string[];
+    interestDetails?: string[];
+    growthGoal?: string | null;
   };
   completion?: { story?: { id: string } };
 }

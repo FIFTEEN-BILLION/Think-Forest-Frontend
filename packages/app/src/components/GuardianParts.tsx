@@ -239,7 +239,7 @@ const GUARDIAN_LINKS = [
 
 export function GuardianNav() {
   return (
-    <nav className="filters space-top" aria-label="보호자 화면">
+    <nav className="guardian-nav" aria-label="보호자 화면">
       {GUARDIAN_LINKS.map((link) => (
         <NavLink
           key={link.to}
@@ -340,7 +340,6 @@ export function GuardianSection({
         </div>
         <p>{description}</p>
       </header>
-      <GuardianNav />
       <GuardianProfilePicker />
       {children}
     </>

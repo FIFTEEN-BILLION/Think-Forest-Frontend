@@ -64,7 +64,7 @@ function SafetyBody() {
       {page?.notice && <Notice>{page.notice}</Notice>}
 
       {needsAttention.length > 0 && (
-        <section className="panel space-top">
+        <section className="panel space-top guardian-attention">
           <h2>먼저 봐 주세요 {needsAttention.length}건</h2>
           <div className="stack space-top">
             {needsAttention.map((event) => (
@@ -137,7 +137,7 @@ function SafetyBody() {
 export function GuardianSafetyScreen() {
   return (
     <GuardianSection
-      title="안내가 필요한 순간만 알려 드려요."
+      title="안전 기록"
       description="점수나 차단 규칙은 보여 주지 않아요. 무슨 종류였는지와 어떻게 도우면 좋을지만 전해요."
     >
       <GuardianGate needsProfile={false}>

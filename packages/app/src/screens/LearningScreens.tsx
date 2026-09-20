@@ -6,6 +6,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { errorMessage, json } from '../api/requestOptions';
 import { ApiError } from '../api/client';
 import { safeReturnTo } from '../api/v1/chat';
+import { greetingProcessingNotice } from '../api/v1/greeting';
 import { useAction, useServerQuery } from '../hooks/useServerApi';
 import { useBackend } from '../providers/BackendProvider';
 import { Message, Wait } from '../components/QueryFeedback';
@@ -15,17 +16,22 @@ import { VoiceInput } from '../components/VoiceInput';
 import type { Model } from '../api/schema';
 import { Navigate } from 'react-router-dom';
 import { ApiActivity, ActivityCatalog } from './ActivityScreens';
+import { FirstGreetingGate } from './OnboardingScreen';
 
 export function ServerTalk({ greeting = false }: { greeting?: boolean }) {
   const location = useLocation();
   const backend = useBackend();
   if (
     greeting &&
+    backend.me?.user.role !== 'GUEST' &&
     !backend.me?.user.needsFirstGreeting &&
     !new URLSearchParams(location.search).has('sessionId')
   )
     return <Navigate replace to={safeReturnTo(new URLSearchParams(location.search).get('next'))} />;
-  return <TalkSession key={`${location.pathname}${location.search}`} greeting={greeting} />;
+  const session = (
+    <TalkSession key={`${location.pathname}${location.search}`} greeting={greeting} />
+  );
+  return greeting ? <FirstGreetingGate>{session}</FirstGreetingGate> : session;
 }
 function TalkSession({ greeting }: { greeting: boolean }) {
   const backend = useBackend();
@@ -88,6 +94,7 @@ function TalkSession({ greeting }: { greeting: boolean }) {
     );
   if (!conversation.data) return <Wait error={conversation.error} retry={conversation.retry} />;
   const session = conversation.data;
+  const processingNotice = greeting ? greetingProcessingNotice(session.processing) : null;
   const id = session.sessionId ?? session.conversationId!;
   const messages = session.messages ?? (session.assistantMessage ? [session.assistantMessage] : []);
   const interaction =
@@ -156,7 +163,10 @@ function TalkSession({ greeting }: { greeting: boolean }) {
       }
       const result = await backend.request<{ story?: { id: string } }>(
         `${prefix}/${id}/complete`,
-        json({ trigger: 'BUTTON' }),
+        json({
+          trigger: 'BUTTON',
+          ...(greeting ? { profileRevision: session.profileRevision } : {}),
+        }),
       );
       await backend.refreshMe();
       sessionStorage.removeItem(`jjcp-active-${backend.scopeId}-${prefix}-${topic}`);
@@ -189,10 +199,33 @@ function TalkSession({ greeting }: { greeting: boolean }) {
           </p>
           {greeting ? (
             <div className="extract-status">
-              <span className={session.profileDraft?.nickname ? 'done' : ''}>이름·별명</span>
-              <span className={session.profileDraft?.gradeOrAgeBand ? 'done' : ''}>소속·학년</span>
+              <small>네가 확인하면 기억할게!</small>
+              <span className={session.profileDraft?.nickname ? 'done' : ''}>
+                <b>
+                  이름·별명
+                  {session.profileDraft?.nickname && <small>{session.profileDraft.nickname}</small>}
+                </b>
+              </span>
+              <span
+                className={
+                  session.profileDraft?.gradeOrAgeBand || session.profileDraft?.schoolOrGroup
+                    ? 'done'
+                    : ''
+                }
+              >
+                <b>
+                  소속·학년
+                  <small>
+                    {[session.profileDraft?.schoolOrGroup, session.profileDraft?.gradeOrAgeBand]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </small>
+                </b>
+              </span>
               <span className={session.profileDraft?.interests.length ? 'done' : ''}>
-                좋아하는 것
+                <b>
+                  좋아하는 것<small>{session.profileDraft?.interests.join(', ')}</small>
+                </b>
               </span>
             </div>
           ) : (
@@ -216,6 +249,11 @@ function TalkSession({ greeting }: { greeting: boolean }) {
               </div>
             </div>
           </div>
+          {processingNotice && (
+            <p className="greeting-processing" role="status">
+              {processingNotice}
+            </p>
+          )}
           <Message
             text={
               outgoing?.status === 'failed' ? reading.message : action.message || reading.message
@@ -262,9 +300,36 @@ function TalkSession({ greeting }: { greeting: boolean }) {
                 <div className="server-bubble-content">
                   <small className="message-name">
                     {m.role === 'USER' ? '나' : '티키'}
-                    {m.source === 'fallback' ? ' · 준비된 안내' : ''}
+                    {m.source === 'fallback'
+                      ? greeting
+                        ? ' · 시스템 안내'
+                        : ' · 서버 기본 안내'
+                      : m.source === 'ai'
+                        ? ' · AI 대화'
+                        : ''}
                   </small>
                   <p>{m.content}</p>
+                  {greeting &&
+                    m.id === messages.at(-1)?.id &&
+                    session.status === 'READY_TO_FINISH' &&
+                    session.profileDraft && (
+                      <dl className="greeting-review" aria-label="최종 확인할 프로필">
+                        <dt>이름·별명</dt>
+                        <dd>{session.profileDraft.nickname}</dd>
+                        <dt>소속·학년</dt>
+                        <dd>
+                          {[session.profileDraft.schoolOrGroup, session.profileDraft.gradeOrAgeBand]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </dd>
+                        <dt>좋아하는 것</dt>
+                        <dd>{session.profileDraft.interests.join(', ')}</dd>
+                        <dt>좋아하는 이유·경험</dt>
+                        <dd>{session.profileDraft.interestDetails?.join(', ')}</dd>
+                        <dt>배우고 싶은 것</dt>
+                        <dd>{session.profileDraft.growthGoal}</dd>
+                      </dl>
+                    )}
                   {m.role === 'ASSISTANT' &&
                     !greeting &&
                     (wordMessage === m.id ? (
@@ -322,6 +387,7 @@ function TalkSession({ greeting }: { greeting: boolean }) {
                         reading.busy ||
                         action.busy ||
                         !backend.useApi ||
+                        backend.me?.user.role === 'GUEST' ||
                         voiceSettings.data?.settings.ttsEnabled === false ||
                         voiceSettings.data?.settings.voiceEnabled === false
                       }
@@ -455,7 +521,11 @@ function TalkSession({ greeting }: { greeting: boolean }) {
                   {!(greeting && interaction?.options.some((o) => o.id === 'CONFIRM_PROFILE')) && (
                     <button
                       className="btn light"
-                      disabled={action.busy || !session.readiness.ready}
+                      disabled={
+                        action.busy ||
+                        !session.readiness.ready ||
+                        (greeting && session.status !== 'READY_TO_FINISH')
+                      }
                       onClick={() => void complete()}
                     >
                       {greeting ? '첫 인사 마치기' : '이야기 완성하기'}

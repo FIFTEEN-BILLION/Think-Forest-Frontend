@@ -1,5 +1,6 @@
 import { createBrowserRouter } from 'react-router-dom';
 import { VillageRoot } from '@jjcp/app/screens';
+import { OnboardingScreen } from '@jjcp/app/screens/OnboardingScreen';
 import { NotFoundScreen } from '@jjcp/app/screens/NotFoundScreen';
 
 // 실제 API와 목데이터는 동일한 화면을 사용한다.
@@ -25,8 +26,19 @@ export const router = createBrowserRouter([
     children: [
       { index: true, lazy: async () => ({ Component: (await readers()).ServerHome }) },
       { path: 'login', lazy: async () => ({ Component: (await login()).LoginScreen }) },
+      { path: 'welcome', Component: OnboardingScreen },
+      {
+        path: 'auth/kakao/callback',
+        lazy: async () => ({ Component: (await login()).KakaoCallbackScreen }),
+      },
       { path: 'talk', lazy: async () => ({ Component: (await learning()).ServerTalk }) },
       { path: 'first-talk', lazy: async () => ({ Component: (await learning()).ServerFirstTalk }) },
+      {
+        path: 'guest/consent',
+        lazy: async () => ({
+          Component: (await import('@jjcp/app/screens/GuestConsentScreen')).GuestConsentScreen,
+        }),
+      },
       ...['adventures', 'adventures/:track', 'adventures/:track/:activityId'].map((path) => ({
         path,
         lazy: async () => ({ Component: (await learning()).ServerAdventures }),

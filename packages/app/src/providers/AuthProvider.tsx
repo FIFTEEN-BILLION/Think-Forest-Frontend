@@ -2,8 +2,14 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { PropsWithChildren } from 'react';
 import { createV1Client, V1_BASE_URL } from '../api/v1/client';
 import type { V1Client } from '../api/v1/client';
-import { devLogin, kakaoAuthorizeUrl, logout as logoutRequest } from '../api/v1/endpoints';
-import type { AuthUser } from '../api/v1/types';
+import {
+  devLogin,
+  exchangeKakaoCode,
+  guestLogin,
+  kakaoAuthorizeUrl,
+  logout as logoutRequest,
+} from '../api/v1/endpoints';
+import type { AuthUser, KakaoExchangeRequest, KakaoExchangeResponse } from '../api/v1/types';
 import { useApiClient } from '../api/ApiClientProvider';
 import { createV1Fetch } from '../api/v1/transport';
 
@@ -16,7 +22,9 @@ interface AuthContextValue {
   /** 호스트(웹 진입점)가 켠 경우에만 true */
   devLoginEnabled: boolean;
   loginWithKakao: (returnTo: string) => void;
+  finishKakaoLogin: (request: KakaoExchangeRequest) => Promise<KakaoExchangeResponse>;
   loginAsDev: (nickname?: string) => Promise<AuthUser>;
+  loginAsGuest: () => Promise<AuthUser>;
   logout: () => Promise<void>;
   updateUser: (patch: Partial<AuthUser>) => void;
 }
@@ -79,7 +87,18 @@ export function AuthProvider({
   }, [client]);
 
   const loginWithKakao = useCallback(
-    (returnTo: string) => window.location.assign(kakaoAuthorizeUrl(returnTo, client.baseUrl)),
+    (returnTo: string) =>
+      window.location.assign(
+        kakaoAuthorizeUrl(
+          returnTo,
+          `${window.location.origin}/auth/kakao/callback`,
+          client.baseUrl,
+        ),
+      ),
+    [client],
+  );
+  const finishKakaoLogin = useCallback(
+    (request: KakaoExchangeRequest) => exchangeKakaoCode(client, request),
     [client],
   );
   const loginAsDev = useCallback(
@@ -88,6 +107,7 @@ export function AuthProvider({
     [client],
   );
   const logout = useCallback(() => logoutRequest(client), [client]);
+  const loginAsGuest = useCallback(async () => (await guestLogin(client)).user, [client]);
   const updateUser = useCallback((patch: Partial<AuthUser>) => client.updateUser(patch), [client]);
 
   const value = useMemo(
@@ -97,11 +117,24 @@ export function AuthProvider({
       client,
       devLoginEnabled,
       loginWithKakao,
+      finishKakaoLogin,
       loginAsDev,
+      loginAsGuest,
       logout,
       updateUser,
     }),
-    [status, user, client, devLoginEnabled, loginWithKakao, loginAsDev, logout, updateUser],
+    [
+      status,
+      user,
+      client,
+      devLoginEnabled,
+      loginWithKakao,
+      finishKakaoLogin,
+      loginAsDev,
+      loginAsGuest,
+      logout,
+      updateUser,
+    ],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

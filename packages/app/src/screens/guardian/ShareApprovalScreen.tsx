@@ -291,7 +291,7 @@ function ShareBody() {
 export function GuardianShareScreen() {
   return (
     <GuardianSection
-      title="공개되기 전에, 보호자가 먼저 읽어요."
+      title="공유 승인"
       description="아이가 올리고 싶어 하는 이야기를 그대로 보여 드려요. 읽은 판을 그대로 승인하고, 그 사이 바뀌면 다시 확인해요."
     >
       <GuardianGate>

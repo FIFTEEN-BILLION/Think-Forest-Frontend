@@ -324,6 +324,7 @@ export interface ApiSchema {
     profileId: string;
     items: Array<ApiSchema['ConsentItemRequest']>;
     actor?: string | null;
+    guardianConfirmed?: boolean;
   };
   ConsentItemRequest: { documentId: string; version?: string | null; agreed?: boolean };
   ConsentListResponse: { items: Array<ApiSchema['ConsentOut']>; nextCursor?: string | null };
@@ -509,6 +510,7 @@ export interface ApiSchema {
     daysActive30: number;
     last7: Array<ApiSchema['DayOut']>;
   };
+  GreetingCompleteRequest: { trigger?: 'BUTTON'; profileRevision: number };
   GreetingCompletion: {
     status: 'ACTIVE' | 'READY_TO_FINISH' | 'FINALIZING' | 'COMPLETED' | 'CANCELLED';
     profile: ApiSchema['app__v1__schemas_conversation__ProfileOut'];
@@ -524,8 +526,17 @@ export interface ApiSchema {
     status: 'ACTIVE' | 'READY_TO_FINISH' | 'FINALIZING' | 'COMPLETED' | 'CANCELLED';
     endIntentDetected: boolean;
     completion?: ApiSchema['GreetingCompletion'] | null;
+    processing?: ApiSchema['GreetingProcessing'] | null;
+    profileRevision?: number;
+    deferredFields?: Array<string>;
   };
+  GreetingProcessing: { mode: 'AI' | 'RULES'; reason?: string | null };
   GreetingReadiness: { ready: boolean; progress: number; missing: Array<string> };
+  GreetingReadinessResponse: {
+    available: boolean;
+    reason: 'guest_consent_required' | 'child_data_mode_off' | 'no_api_key' | 'ai_disabled' | null;
+    message: string | null;
+  };
   GreetingSessionOut: {
     sessionId: string;
     status: 'ACTIVE' | 'READY_TO_FINISH' | 'FINALIZING' | 'COMPLETED' | 'CANCELLED';
@@ -535,6 +546,9 @@ export interface ApiSchema {
     currentInteraction: ApiSchema['Interaction'] | null;
     profileDraft: ApiSchema['ProfileDraftOut'];
     readiness: ApiSchema['GreetingReadiness'];
+    processing?: ApiSchema['GreetingProcessing'] | null;
+    profileRevision?: number;
+    deferredFields?: Array<string>;
   };
   GuardianChildListResponse: {
     items: Array<ApiSchema['GuardianChildOut']>;
@@ -625,6 +639,15 @@ export interface ApiSchema {
     error?: string | null;
   };
   JobResponse: { job: ApiSchema['Job'] };
+  KakaoExchangeRequest: { code: string; state: string; redirectUri: string };
+  KakaoExchangeResponse: {
+    accessToken: string;
+    expiresIn?: number;
+    refreshToken?: string | null;
+    refreshExpiresIn?: number;
+    user: ApiSchema['AuthUser'];
+    returnTo: string;
+  };
   LabRequest: { topic: string; child?: ApiSchema['ChildContext'] };
   LabResponse: {
     ai: boolean;
@@ -957,6 +980,8 @@ export interface ApiSchema {
   RejectRequest: { reason: string };
   ReportRequest: { sentences?: Array<string>; weeklyScores?: Array<ApiSchema['WeeklyScore']> };
   ReportResponse: { ai: boolean; error?: string | null; summary: string; next: string };
+  ResetRequest: Record<string, never>;
+  ResetResponse: { ok?: boolean };
   ResolveRequest: { resolution: 'KEEP' | 'HIDE' | 'DELETE'; note?: string | null };
   ResolveResponse: { report: ApiSchema['AdminReportItem'] };
   ResumeOut: {

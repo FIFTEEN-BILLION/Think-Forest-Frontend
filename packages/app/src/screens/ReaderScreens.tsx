@@ -13,6 +13,7 @@ import { contentAppearance } from '../components/contentAppearance';
 import { BookEditor, CategoryManager } from '../components/ManagementPanels';
 import { ChoiceControl } from '../components/ChoiceControl';
 import { WordbookCard } from '../components/WordbookCard';
+import { StoryReader } from '../components/StoryReader';
 export interface Page<T> {
   items: T[];
   nextCursor: string | null;
@@ -260,7 +261,7 @@ export function ServerLibrary() {
 }
 export function ServerRecord() {
   const id = useLocation().pathname.split('/').at(-1)!;
-  const { request } = useBackend();
+  const { request, me } = useBackend();
   const action = useAction();
   const navigate = useNavigate();
   const [edit, setEdit] = useState(false);
@@ -268,60 +269,76 @@ export function ServerRecord() {
   if (!q.data) return <Wait error={q.error} retry={q.refetch} />;
   const s = q.data.story;
   return (
-    <article className="panel server-detail">
-      <Link to="/shelf">← 책장으로</Link>
-      <h1>{s.title}</h1>
-      <Message text={action.message} />
-      {edit ? (
-        <form
-          key={s.version}
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const f = new FormData(e.currentTarget);
-            void action.run(async () => {
-              await request(
-                `stories/${id}`,
-                json({ title: f.get('title'), body: f.get('body') }, 'PATCH', s.version),
-              );
-              setEdit(false);
-            });
-          }}
-        >
-          <label>
-            제목
-            <input name="title" defaultValue={s.title} required maxLength={80} />
-          </label>
-          <label>
-            이야기
-            <textarea name="body" defaultValue={s.body} rows={10} required maxLength={4000} />
-          </label>
-          <button className="btn light" disabled={action.busy}>
-            수정 저장
-          </button>
-        </form>
-      ) : (
-        <div className="server-prose">{s.body}</div>
-      )}
-      <section>
-        <h2>내 생각의 변화</h2>
-        <p>{s.thoughtJourney.initialIdea}</p>
-        {s.thoughtJourney.evidence.map((v, i) => (
-          <p key={i}>{v}</p>
-        ))}
-        <p>{s.thoughtJourney.finalReflection}</p>
-      </section>
-      <div className="row wrap">
-        <button className="btn light" onClick={() => setEdit(!edit)}>
-          이야기 다듬기
-        </button>
-        <Link to={`/story-share?story=${id}`}>공유 요청</Link>
-        {q.data.sourceConversation && (
-          <Link to={`/talk?session=${q.data.sourceConversation.conversationId}`}>
-            나눈 대화 보기
-          </Link>
-        )}
+    <StoryReader
+      detail={q.data}
+      guest={me?.user.role === 'GUEST'}
+      notice={<Message text={action.message} />}
+      editor={
+        edit ? (
+          <form
+            className="record-editor"
+            key={s.version}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              void action.run(async () => {
+                await request(
+                  `stories/${id}`,
+                  json({ title: f.get('title'), body: f.get('body') }, 'PATCH', s.version),
+                );
+                setEdit(false);
+              });
+            }}
+          >
+            <label>
+              제목
+              <input name="title" defaultValue={s.title} required maxLength={80} />
+            </label>
+            <label>
+              이야기
+              <textarea name="body" defaultValue={s.body} rows={10} required maxLength={4000} />
+            </label>
+            <div className="record-actions">
+              <button className="btn" disabled={action.busy}>
+                {action.busy ? '저장하고 있어요…' : '수정 저장'}
+              </button>
+              <button
+                type="button"
+                className="btn light"
+                disabled={action.busy}
+                onClick={() => setEdit(false)}
+              >
+                취소
+              </button>
+            </div>
+          </form>
+        ) : undefined
+      }
+      actions={
+        <>
+          {!edit && (
+            <button className="btn" onClick={() => setEdit(true)}>
+              <Icon name="spark" /> 이야기 다듬기
+            </button>
+          )}
+          {q.data.sourceConversation && (
+            <Link
+              className="btn light"
+              to={`/talk?session=${q.data.sourceConversation.conversationId}`}
+            >
+              <Icon name="chat" /> 나눈 대화 보기
+            </Link>
+          )}
+          {me?.user.role !== 'GUEST' && (
+            <Link className="btn light" to={`/story-share?story=${id}`}>
+              <Icon name="share" /> 공유 요청
+            </Link>
+          )}
+        </>
+      }
+      management={
         <button
-          className="btn light"
+          className="record-delete"
           disabled={action.busy}
           onClick={async () => {
             if (await confirmAction('이 기록을 삭제할까요?'))
@@ -336,8 +353,8 @@ export function ServerRecord() {
         >
           기록 삭제
         </button>
-      </div>
-    </article>
+      }
+    />
   );
 }
 export function ServerCommunity() {

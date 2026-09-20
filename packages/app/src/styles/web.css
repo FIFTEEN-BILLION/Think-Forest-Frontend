@@ -4,6 +4,7 @@
 @import './home.css';
 @import './server.css';
 @import './guardian.css';
+@import './record.css';
 
 main:focus {
   outline: none;

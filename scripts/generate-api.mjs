@@ -18,7 +18,13 @@ function type(schema = {}) {
   if (schema.type === 'number' || schema.type === 'integer') return 'number';
   if (schema.type === 'string') return 'string';
   if (schema.type === 'object' || schema.properties) {
-    if (!schema.properties)
+    if (
+      schema.properties &&
+      Object.keys(schema.properties).length === 0 &&
+      schema.additionalProperties === false
+    )
+      return 'Record<string, never>';
+    if (!schema.properties || Object.keys(schema.properties).length === 0)
       return `Record<string, ${typeof schema.additionalProperties === 'object' ? type(schema.additionalProperties) : 'unknown'}>`;
     return `{${Object.entries(schema.properties)
       .map(

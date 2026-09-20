@@ -285,7 +285,7 @@ function LinksBody() {
         </div>
       </section>
 
-      <div className="stack space-top">
+      <div className="guardian-columns">
         {links.map((link) => (
           <LinkRow
             key={link.id}
@@ -348,7 +348,7 @@ function LinksBody() {
 export function GuardianLinksScreen() {
   return (
     <GuardianSection
-      title="아이를 함께 보는 사람을 정해요."
+      title="보호자 연결"
       description="계정 하나가 곧 아이는 아니에요. 아이 프로필과 보호자 계정을 따로 두고, 권한도 항목별로 나눠요."
     >
       <GuardianGate>

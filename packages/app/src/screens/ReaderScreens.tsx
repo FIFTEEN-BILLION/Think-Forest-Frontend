@@ -12,6 +12,7 @@ import { PageHeading, EmptyState } from '../components/ui';
 import { contentAppearance } from '../components/contentAppearance';
 import { BookEditor, CategoryManager } from '../components/ManagementPanels';
 import { ChoiceControl } from '../components/ChoiceControl';
+import { WordbookCard } from '../components/WordbookCard';
 export interface Page<T> {
   items: T[];
   nextCursor: string | null;
@@ -40,6 +41,7 @@ export function More({
   );
 }
 export function ServerHome() {
+  const { me } = useBackend();
   const q = useServerQuery<Model<'HomeResponse'>>('home');
   const stories = useServerQuery<Model<'StoryList'>>('stories?limit=3');
   const activities = useServerQuery<{
@@ -50,6 +52,7 @@ export function ServerHome() {
   return (
     <>
       <ApiHomeView
+        guest={me?.user.role === 'GUEST'}
         home={q.data}
         stories={stories.data?.items ?? []}
         active={activities.data?.items ?? []}
@@ -124,6 +127,7 @@ export function ServerLibrary() {
                 <Link
                   className={`book-cover ${contentAppearance(s.category).color}`}
                   to={`/shelf/${s.id}`}
+                  title={s.title}
                 >
                   <span className="eyebrow">MY LITTLE DISCOVERY</span>
                   <h3>{s.title}</h3>
@@ -504,38 +508,40 @@ export function ServerWords() {
         </section>
       )}
       <Message text={action.message} />
-      <label>
-        학습 상태
-        <select
-          value={filter}
-          onChange={(e) => {
-            setFilter(e.target.value);
-            go('');
-          }}
+      <div className="word-toolbar">
+        <label>
+          학습 상태
+          <select
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              go('');
+            }}
+          >
+            <option value="">전체</option>
+            <option value="NEW">새 단어</option>
+            <option value="PRACTICING">연습 중</option>
+            <option value="FAMILIAR">익숙한 단어</option>
+          </select>
+        </label>
+        <button
+          className="btn light"
+          disabled={action.busy || !q.data?.summary.total}
+          onClick={() =>
+            void action.run(async () => {
+              const r = await backend.request<Model<'WordQuizOut'>>(
+                'word-quizzes',
+                json({ count: 5 }),
+              );
+              cache.set(`word-quizzes/${r.id}`, r);
+              quizSelect(r.id);
+              sessionStorage.setItem(key, r.id);
+            })
+          }
         >
-          <option value="">전체</option>
-          <option value="NEW">새 단어</option>
-          <option value="PRACTICING">연습 중</option>
-          <option value="FAMILIAR">익숙한 단어</option>
-        </select>
-      </label>
-      <button
-        className="btn light"
-        disabled={action.busy || !q.data?.summary.total}
-        onClick={() =>
-          void action.run(async () => {
-            const r = await backend.request<Model<'WordQuizOut'>>(
-              'word-quizzes',
-              json({ count: 5 }),
-            );
-            cache.set(`word-quizzes/${r.id}`, r);
-            quizSelect(r.id);
-            sessionStorage.setItem(key, r.id);
-          })
-        }
-      >
-        단어 퀴즈 시작
-      </button>
+          단어 퀴즈 시작
+        </button>
+      </div>
       {quizId &&
         (!quiz.data ? (
           <Wait error={quiz.error} retry={quiz.refetch} />
@@ -578,65 +584,26 @@ export function ServerWords() {
         <Wait error={q.error} retry={q.refetch} />
       ) : (
         <>
-          <p>
+          <p className="word-list-caption">
             전체 {q.data.summary.total}개 · 익숙한 단어 {q.data.summary.familiar}개
           </p>
-          <div className="word-grid">
+          <div className="word-grid word-pocket-grid">
             {q.data.items.map((w) => (
-              <article className="word-card" key={w.id}>
-                <span className="word-emoji" aria-hidden="true">
-                  🌱
-                </span>
-                <span className={`tag ${w.status === 'FAMILIAR' ? 'teal' : 'gold'}`}>
-                  {w.status === 'FAMILIAR' ? '알아요' : w.status === 'NEW' ? '새 단어' : '연습 중'}
-                </span>
-                <h2>
-                  {w.word} {w.reading !== w.word && <small>{w.reading}</small>}
-                </h2>
-                <p>{w.meaning}</p>
-                <blockquote>{w.example}</blockquote>
-                <form
-                  key={w.updatedAt}
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const f = new FormData(e.currentTarget);
-                    void action.run(async () => {
-                      await backend.request(
-                        `wordbook/entries/${w.id}`,
-                        json({ mySentence: f.get('sentence'), status: f.get('status') }, 'PATCH'),
-                      );
-                    });
-                  }}
-                >
-                  <label>
-                    내 문장
-                    <textarea name="sentence" defaultValue={w.mySentence ?? ''} maxLength={200} />
-                  </label>
-                  <label>
-                    학습 상태
-                    <select name="status" defaultValue={w.status}>
-                      <option value="NEW">새 단어</option>
-                      <option value="PRACTICING">연습 중</option>
-                      <option value="FAMILIAR">익숙한 단어</option>
-                    </select>
-                  </label>
-                  <button className="btn light" disabled={action.busy}>
-                    저장
-                  </button>
-                </form>
-                <button
-                  className="btn light"
-                  disabled={action.busy}
-                  onClick={async () => {
-                    if (await confirmAction('이 단어를 지울까요?'))
-                      void action.run(async () => {
-                        await backend.request(`wordbook/entries/${w.id}`, { method: 'DELETE' });
-                      });
-                  }}
-                >
-                  단어 삭제
-                </button>
-              </article>
+              <WordbookCard
+                key={w.id}
+                word={w}
+                busy={action.busy}
+                onSave={async (values) => {
+                  await backend.request(`wordbook/entries/${w.id}`, json(values, 'PATCH'));
+                  await backend.invalidate();
+                }}
+                onDelete={async () => {
+                  if (!(await confirmAction('이 단어를 지울까요?'))) return false;
+                  await backend.request(`wordbook/entries/${w.id}`, { method: 'DELETE' });
+                  await backend.invalidate();
+                  return true;
+                }}
+              />
             ))}
           </div>
           {!q.data.items.length && (

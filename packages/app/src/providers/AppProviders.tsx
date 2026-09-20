@@ -15,6 +15,7 @@ type AppProvidersProps = PropsWithChildren<{
   apiBaseUrl: string;
   /** 로그인 화면의 개발용 로그인 버튼 노출 여부. 웹 진입점이 환경변수에서 읽어 넘긴다. */
   devLogin?: boolean;
+  debugMode?: boolean;
   request?: ApiRequest;
   useApi?: boolean;
 }>;
@@ -22,6 +23,7 @@ type AppProvidersProps = PropsWithChildren<{
 export function AppProviders({
   apiBaseUrl,
   devLogin = false,
+  debugMode = false,
   request,
   useApi = true,
   children,
@@ -33,7 +35,7 @@ export function AppProviders({
       <QueryClientProvider client={queryClient}>
         <ApiClientProvider baseUrl={apiBaseUrl} request={request}>
           <AuthProvider baseUrl={resolveApiUrl(apiBaseUrl, 'api/v1')} devLoginEnabled={devLogin}>
-            <BackendProvider devLoginEnabled={devLogin} useApi={useApi}>
+            <BackendProvider devLoginEnabled={devLogin} debugMode={debugMode} useApi={useApi}>
               {children}
             </BackendProvider>
           </AuthProvider>

@@ -1,10 +1,12 @@
 // JJCP API v1 계약 타입. API_SPEC.md(2·3·4·5·7·10·11·12절)와 구현 보충 결정 문서를 그대로 옮긴다.
 // 명세에 글자 그대로 없는 부분은 "가정"이라고 적어 둔다.
 
+import type { GreetingProcessing } from './greeting';
+
 // ---------- 공통 ----------
 
 export type SessionStatus = 'ACTIVE' | 'READY_TO_FINISH' | 'FINALIZING' | 'COMPLETED' | 'CANCELLED';
-export type UserRole = 'CHILD' | 'GUARDIAN' | (string & {});
+export type UserRole = 'CHILD' | 'GUARDIAN' | 'GUEST' | (string & {});
 export type CompletionTrigger = 'BUTTON' | 'CHAT_END_INTENT';
 
 export interface V1ErrorBody {
@@ -66,6 +68,16 @@ export interface TokenResponse {
   user: AuthUser;
 }
 
+export interface KakaoExchangeRequest {
+  code: string;
+  state: string;
+  redirectUri: string;
+}
+
+export interface KakaoExchangeResponse extends TokenResponse {
+  returnTo: string;
+}
+
 export interface DevLoginRequest {
   deviceKey: string;
   nickname?: string;
@@ -109,6 +121,9 @@ export interface FirstGreetingSession {
   messages: ChatMessage[];
   profileDraft: ProfileDraft;
   readiness: FirstGreetingReadiness;
+  processing?: GreetingProcessing | null;
+  profileRevision: number;
+  deferredFields: string[];
   currentInteraction?: NextInteraction | null;
   nextCursor?: string | null;
 }
@@ -132,6 +147,9 @@ export interface FirstGreetingMessageResponse {
   nextInteraction: NextInteraction | null;
   profileDraft: ProfileDraft;
   readiness: FirstGreetingReadiness;
+  processing?: GreetingProcessing | null;
+  profileRevision: number;
+  deferredFields: string[];
   status: SessionStatus;
   endIntentDetected: boolean;
   completion?: FirstGreetingCompletion | null;
@@ -949,6 +967,7 @@ export interface Consent {
 
 export interface ConsentCreateRequest {
   profileId: string;
+  guardianConfirmed?: boolean;
   items: { documentId: ConsentDocumentId; version?: string; agreed?: boolean }[];
   actor?: 'GUARDIAN' | 'CHILD' | (string & {});
 }

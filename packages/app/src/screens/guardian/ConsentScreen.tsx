@@ -205,7 +205,7 @@ function ConsentBody() {
           <p className="muted">약관 문서를 불러오지 못했어요. 잠시 뒤 다시 열어 주세요.</p>
         </section>
       ) : (
-        <div className="stack space-top">
+        <div className="guardian-columns guardian-consent-grid">
           {documents.map((document) => (
             <ConsentCard
               key={document.id}
@@ -271,7 +271,7 @@ function ConsentBody() {
 export function GuardianConsentScreen() {
   return (
     <GuardianSection
-      title="무엇에 동의할지, 보호자가 정해요."
+      title="동의와 약관"
       description="목적이 다른 동의는 따로 여쭤보고 버전별로 기록해요. 동의하지 않아도 쓸 수 있는 기능은 그대로 열려 있어요."
     >
       <GuardianGate>

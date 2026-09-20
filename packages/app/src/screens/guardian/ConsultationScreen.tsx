@@ -229,7 +229,7 @@ function ConsultationBody() {
 export function GuardianConsultationScreen() {
   return (
     <GuardianSection
-      title="한 달을 모아 보면 보이는 것들."
+      title="월간 상담"
       description="쌓인 대화에서 관찰된 모습과 근거가 된 이야기를 정리해요. 진단이 아니라 기록이에요."
     >
       <GuardianGate>

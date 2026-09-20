@@ -136,7 +136,7 @@ function ProgressBody() {
           <p className="muted space-top">
             {report.period.from} ~ {report.period.to} · {profile?.nickname ?? '아이'}
           </p>
-          <div className="cards stats">
+          <div className="cards stats guardian-stats">
             {ACTIVITY_LABELS.map(([key, label]) => (
               <section className="panel" key={key}>
                 <span className="stat-label">{label}</span>
@@ -256,7 +256,7 @@ function ProgressBody() {
 export function GuardianProgressScreen() {
   return (
     <GuardianSection
-      title="무엇을 했는지, 있는 그대로."
+      title="성장 리포트"
       description="능력을 매기지 않아요. 아이가 실제로 말하고 쓴 횟수와 이야기한 날을 보여 드려요."
     >
       <GuardianGate>

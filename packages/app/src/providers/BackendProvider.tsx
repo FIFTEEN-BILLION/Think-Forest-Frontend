@@ -13,6 +13,7 @@ type Request = <T>(path: string, options?: RequestInit) => Promise<T>;
 interface Backend {
   useApi: boolean;
   devLoginEnabled: boolean;
+  debugMode: boolean;
   me: Me | null;
   loading: boolean;
   error: string;
@@ -20,6 +21,7 @@ interface Backend {
   scopeId: string;
   request: Request;
   login: () => Promise<void>;
+  startGuest: () => Promise<void>;
   logout: () => Promise<void>;
   refreshMe: () => Promise<void>;
   invalidate: () => Promise<void>;
@@ -30,11 +32,12 @@ const Context = createContext<Backend | null>(null);
 export function BackendProvider({
   children,
   devLoginEnabled = false,
+  debugMode = false,
   useApi = true,
-}: PropsWithChildren<{ devLoginEnabled?: boolean; useApi?: boolean }>) {
+}: PropsWithChildren<{ devLoginEnabled?: boolean; debugMode?: boolean; useApi?: boolean }>) {
   const api = useApiClient();
   const cache = useQueryClient();
-  const { client, status, loginAsDev, logout: authLogout } = useAuth();
+  const { client, status, loginAsDev, loginAsGuest, logout: authLogout } = useAuth();
   useEffect(() => {
     if (status === 'signedOut') void replaceAccount(cache, null);
   }, [cache, status]);
@@ -118,22 +121,39 @@ export function BackendProvider({
       await replaceAccount(cache, me);
     },
   });
+  const guest = useMutation({
+    mutationKey: ['auth', 'guest'],
+    mutationFn: async () => {
+      await loginAsGuest();
+      return await request<Me>('me');
+    },
+    onSuccess: async (me) => {
+      await replaceAccount(cache, me);
+    },
+  });
   const logout = useMutation({
     mutationKey: ['auth', 'logout'],
     mutationFn: () => authLogout(),
     onSuccess: async () => {
       await replaceAccount(cache, null);
       login.reset();
+      guest.reset();
     },
   });
-  const failure = login.error ?? logout.error ?? account.error;
+  const failure = guest.error ?? login.error ?? logout.error ?? account.error;
   return (
     <Context.Provider
       value={{
         useApi,
         devLoginEnabled,
+        debugMode,
         me: status === 'signedIn' ? (account.data ?? null) : null,
-        loading: status === 'loading' || account.isPending || login.isPending || logout.isPending,
+        loading:
+          status === 'loading' ||
+          account.isPending ||
+          login.isPending ||
+          guest.isPending ||
+          logout.isPending,
         error: failure ? errorMessage(failure) : '',
         profileId:
           account.data?.profiles.find((p) => p.isDefault)?.id ?? account.data?.profile?.id ?? '',
@@ -141,11 +161,21 @@ export function BackendProvider({
         request,
         refreshMe,
         login: async () => {
+          guest.reset();
           logout.reset();
           try {
             await login.mutateAsync();
           } catch {
             /* Render mutation error. */
+          }
+        },
+        startGuest: async () => {
+          login.reset();
+          logout.reset();
+          try {
+            await guest.mutateAsync();
+          } catch {
+            /* 오류는 화면에 표시한다. */
           }
         },
         logout: async () => {

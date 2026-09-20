@@ -79,6 +79,8 @@ import type {
   FirstGreetingMessageResponse,
   FirstGreetingSession,
   HomeResponse,
+  KakaoExchangeRequest,
+  KakaoExchangeResponse,
   MeResponse,
   Page,
   SendMessageRequest,
@@ -105,12 +107,27 @@ export function toPage<T>(raw: unknown, key: string): Page<T> {
 // ---------- 인증 ----------
 
 /** 웹 카카오 로그인 시작 주소. 전체 페이지 이동으로 연다. */
-export function kakaoAuthorizeUrl(returnTo: string, baseUrl = V1_BASE_URL) {
-  return `${baseUrl.replace(/\/$/, '')}/auth/kakao/authorize?returnTo=${encodeURIComponent(returnTo)}`;
+export function kakaoAuthorizeUrl(returnTo: string, redirectUri: string, baseUrl = V1_BASE_URL) {
+  return `${baseUrl.replace(/\/$/, '')}/auth/kakao/authorize?returnTo=${encodeURIComponent(returnTo)}&redirectUri=${encodeURIComponent(redirectUri)}`;
+}
+
+/** 프론트 콜백이 받은 인가 코드를 서버에 넘겨 서비스 토큰으로 교환한다. */
+export async function exchangeKakaoCode(client: V1Client, body: KakaoExchangeRequest) {
+  const token = await client.request<KakaoExchangeResponse>('/auth/kakao/exchange', {
+    body,
+    auth: false,
+  });
+  client.acceptTokens(token);
+  return token;
 }
 
 export async function devLogin(client: V1Client, body: DevLoginRequest) {
   const token = await client.request<TokenResponse>('/auth/dev/login', { body, auth: false });
+  return client.acceptTokens(token);
+}
+
+export async function guestLogin(client: V1Client) {
+  const token = await client.request<TokenResponse>('/auth/guest', { body: {}, auth: false });
   return client.acceptTokens(token);
 }
 
@@ -175,12 +192,12 @@ export function sendFirstGreetingMessage(
 export function completeFirstGreeting(
   client: V1Client,
   sessionId: string,
-  trigger: CompletionTrigger = 'BUTTON',
+  profileRevision: number,
   idempotencyKey = newIdempotencyKey(),
 ) {
   return client.request<FirstGreetingCompletion>(
     `/first-greeting/sessions/${id(sessionId)}/complete`,
-    { body: { trigger }, idempotencyKey },
+    { body: { trigger: 'BUTTON', profileRevision }, idempotencyKey },
   );
 }
 

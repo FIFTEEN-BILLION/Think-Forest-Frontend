@@ -6,9 +6,11 @@ import type { Theme } from '../types/village';
 import { useBackend } from '../providers/BackendProvider';
 import { BackendGate } from './BackendGate';
 import { NotificationBell } from './NotificationBell';
+import { DebugResetButton } from './DebugResetButton';
 import { useServerQuery, useAction } from '../hooks/useServerApi';
 import { json } from '../api/requestOptions';
 import type { Model } from '../api/schema';
+const THEME_STORAGE_KEY = 'jjcp.theme';
 const navigation = [
   { to: '/', label: '오늘의 이야기', icon: 'home' },
   { to: '/shelf', label: '나의 책장', icon: 'book' },
@@ -25,38 +27,55 @@ export function VillageRoot() {
     backend.profileId ? `profiles/${backend.profileId}/settings` : null,
   );
   const profiles = useServerQuery<Model<'ProfileListResponse'>>('profiles');
-  const theme = (settings.data?.settings.theme.toLowerCase() ?? 'auto') as Theme;
+  const [localTheme, setLocalTheme] = useState<Theme>(() => {
+    try {
+      const saved = localStorage.getItem(THEME_STORAGE_KEY);
+      return saved === 'light' || saved === 'dark' ? saved : 'auto';
+    } catch {
+      return 'auto';
+    }
+  });
+  const theme = (settings.data?.settings.theme.toLowerCase() ?? localTheme) as Theme;
   useEffect(() => {
     if (theme === 'auto') document.documentElement.removeAttribute('data-theme');
     else document.documentElement.dataset.theme = theme;
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, theme);
+    } catch {
+      // Theme switching still works when browser storage is unavailable.
+    }
   }, [theme]);
   const selectedProfile = profiles.data?.items.find((p) => p.id === backend.profileId);
   const displayName = selectedProfile?.nickname || backend.me?.profile?.nickname || '새싹';
   const [menu, setMenu] = useState(false);
   const location = useLocation();
   const sidebar = useRef<HTMLElement>(null);
-  const title = location.pathname.startsWith('/guardian/')
-    ? '보호자 공간'
-    : location.pathname.startsWith('/first-talk')
-      ? '티키와 첫 인사'
-      : location.pathname.startsWith('/talk')
-        ? '티키와 대화하기'
-        : location.pathname.startsWith('/login')
-          ? '로그인'
-          : location.pathname.startsWith('/topics/new')
-            ? '내가 주제 정하기'
-            : location.pathname.startsWith('/story-share')
-              ? '내 이야기 공유하기'
-              : location.pathname.startsWith('/profile')
-                ? '내 프로필과 설정'
-                : location.pathname.startsWith('/data')
-                  ? '내 기록 관리'
-                  : location.pathname.startsWith('/tech')
-                    ? '티키와 기록 안내'
-                    : /^\/(adventures|session)/.test(location.pathname)
-                      ? '생각 모험'
-                      : (navigation.find((n) => n.to !== '/' && location.pathname.startsWith(n.to))
-                          ?.label ?? '오늘의 이야기');
+  const title =
+    location.pathname === '/welcome' || location.pathname === '/guest/consent'
+      ? '이용 안내와 동의'
+      : location.pathname.startsWith('/guardian/')
+        ? '보호자 공간'
+        : location.pathname.startsWith('/first-talk')
+          ? '티키와 첫 인사'
+          : location.pathname.startsWith('/talk')
+            ? '티키와 대화하기'
+            : location.pathname.startsWith('/login')
+              ? '로그인'
+              : location.pathname.startsWith('/topics/new')
+                ? '내가 주제 정하기'
+                : location.pathname.startsWith('/story-share')
+                  ? '내 이야기 공유하기'
+                  : location.pathname.startsWith('/profile')
+                    ? '내 프로필과 설정'
+                    : location.pathname.startsWith('/data')
+                      ? '내 기록 관리'
+                      : location.pathname.startsWith('/tech')
+                        ? '티키와 기록 안내'
+                        : /^\/(adventures|session)/.test(location.pathname)
+                          ? '생각 모험'
+                          : (navigation.find(
+                              (n) => n.to !== '/' && location.pathname.startsWith(n.to),
+                            )?.label ?? '오늘의 이야기');
   useEffect(() => {
     document.title = `${title} · 우리 아이 생각친구, 티키`;
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -94,15 +113,13 @@ export function VillageRoot() {
   }, [menu]);
   const cycleTheme = () => {
     const themes: Theme[] = ['auto', 'light', 'dark'];
+    const nextTheme = themes[(themes.indexOf(theme) + 1) % 3]!;
+    setLocalTheme(nextTheme);
     if (settings.data && backend.profileId)
       void themeAction.run(async () => {
         await backend.request(
           `profiles/${backend.profileId}/settings`,
-          json(
-            { theme: themes[(themes.indexOf(theme) + 1) % 3]!.toUpperCase() },
-            'PATCH',
-            settings.data!.settings.version,
-          ),
+          json({ theme: nextTheme.toUpperCase() }, 'PATCH', settings.data!.settings.version),
         );
       });
   };
@@ -187,6 +204,7 @@ export function VillageRoot() {
             </Link>
           </div>
           <span className="status">안전한 어린이 모드</span>
+          {backend.me?.user.role !== 'GUEST' && <DebugResetButton />}
         </div>
       </aside>
       {menu && (
@@ -243,12 +261,18 @@ export function VillageRoot() {
                   ))}
               </select>
             )}
-            <span className="status">{backend.me ? '내 기록' : '함께 시작해요'}</span>
-            <NotificationBell key={backend.scopeId} />
+            <span className="status">
+              {backend.me?.user.role === 'GUEST'
+                ? '게스트 체험 중'
+                : backend.me
+                  ? '내 기록'
+                  : '함께 시작해요'}
+            </span>
+            {backend.me?.user.role !== 'GUEST' && <NotificationBell key={backend.scopeId} />}
             <button
               className="icon-btn"
               onClick={cycleTheme}
-              disabled={!settings.data || themeAction.busy}
+              disabled={themeAction.busy}
               aria-label={`화면 테마 변경, 현재 ${{ auto: '기기 설정', light: '라이트', dark: '다크' }[theme]}`}
             >
               <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
@@ -259,6 +283,19 @@ export function VillageRoot() {
           </div>
         </header>
         <main id="main" tabIndex={-1}>
+          {backend.me?.user.role === 'GUEST' && (
+            <div className="panel row wrap" role="status">
+              <span>게스트 체험 · 최대 24시간 · 기록은 카카오 계정으로 옮겨지지 않아요.</span>
+              <Link to="/guest/consent">보호자 동의</Link>
+              <button
+                className="btn"
+                disabled={backend.loading}
+                onClick={() => void backend.logout()}
+              >
+                체험 종료
+              </button>
+            </div>
+          )}
           {themeAction.message && <Notice variant="error">{themeAction.message}</Notice>}
           <Suspense
             fallback={

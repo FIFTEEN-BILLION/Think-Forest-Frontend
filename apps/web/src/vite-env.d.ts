@@ -9,6 +9,8 @@ interface ImportMetaEnv {
   readonly VITE_DEV_API_TARGET?: string;
   /** 'true' 면 로그인 화면에 개발용 로그인 버튼을 보인다 */
   readonly VITE_DEV_LOGIN?: string;
+  /** 서버 DEBUG_MODE와 함께 켜야 내 계정 초기화 버튼이 동작한다. */
+  readonly VITE_DEBUG_MODE?: string;
 }
 
 interface ImportMeta {

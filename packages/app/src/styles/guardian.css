@@ -1,0 +1,368 @@
+/* 보호자 경로에만 적용한다. 아이용 화면의 큰 글자와 터치 영역은 유지한다. */
+.api-page .guardian-workspace {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.guardian-workspace .guardian-content {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.guardian-workspace .guardian-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 28px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper-1);
+}
+.guardian-workspace .guardian-nav .chip {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-700);
+}
+.guardian-workspace .guardian-nav .chip.active {
+  border-color: var(--teal);
+  background: var(--teal-soft);
+  color: var(--teal);
+  font-weight: 750;
+}
+.guardian-workspace .page-head {
+  margin: 0;
+  padding: 0 0 4px;
+}
+.guardian-workspace .page-head h1 {
+  margin: 6px 0 0;
+  font-size: clamp(26px, 2.4vw, 32px);
+  line-height: 1.3;
+  letter-spacing: -0.035em;
+}
+.guardian-workspace .page-head p {
+  max-width: 80ch;
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.guardian-workspace .eyebrow {
+  font-size: 11px;
+}
+.guardian-workspace :where(h2, h3, h4) {
+  margin: 0;
+  line-height: 1.45;
+}
+.guardian-workspace h2 {
+  font-size: 20px;
+}
+.guardian-workspace h3 {
+  font-size: 17px;
+}
+.guardian-workspace h4 {
+  font-size: 15px;
+}
+.guardian-workspace p {
+  margin: 8px 0;
+  font-size: 14px;
+  line-height: 1.7;
+}
+.guardian-workspace small {
+  font-size: 12px;
+}
+.guardian-workspace .panel {
+  min-height: 0;
+  margin: 0;
+  padding: 22px;
+  border-radius: 16px;
+  box-shadow: none;
+}
+.guardian-workspace .panel h3 {
+  font-size: 17px;
+}
+.guardian-workspace .section-title {
+  margin: 20px 0 10px;
+  font-size: 15px;
+}
+.guardian-workspace .section-title:first-child {
+  margin-top: 0;
+}
+.guardian-workspace .space-top {
+  margin-top: 14px;
+}
+.guardian-workspace .guardian-content > .space-top,
+.guardian-workspace .guardian-columns > .space-top {
+  margin-top: 0;
+}
+.guardian-workspace .stack {
+  display: grid;
+  gap: 16px;
+}
+.guardian-workspace .guardian-columns,
+.guardian-workspace .bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 20px;
+  margin: 0;
+}
+.guardian-workspace .guardian-toolbar,
+.guardian-workspace .compact-select {
+  width: min(100%, 240px);
+  margin: 0;
+}
+.guardian-workspace label,
+.guardian-workspace legend {
+  font-size: 13px;
+  font-weight: 600;
+}
+.guardian-workspace label:not(.choice-control) {
+  margin: 12px 0;
+}
+.guardian-workspace .guardian-toolbar label {
+  margin: 0;
+}
+.guardian-workspace :where(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: 42px;
+  margin: 5px 0 0;
+  padding: 9px 12px;
+  border-radius: 9px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.api-page .guardian-workspace textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+.guardian-workspace .btn,
+.guardian-workspace .chip {
+  min-height: 40px;
+  padding: 9px 14px;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.guardian-workspace .btn .icon {
+  width: 17px;
+  height: 17px;
+}
+.guardian-workspace .actions,
+.guardian-workspace .filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+.guardian-workspace .actions .btn {
+  margin: 0;
+}
+.guardian-workspace .tag {
+  padding: 5px 9px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.guardian-workspace .choice-control {
+  min-height: 42px;
+  margin: 8px 0;
+  padding: 10px 12px;
+}
+.guardian-workspace .choice-control-copy > span {
+  font-size: 14px;
+}
+.guardian-workspace .choice-control-copy small {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.guardian-workspace .notice {
+  margin: 12px 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.guardian-workspace .notice > .icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+}
+.guardian-workspace .guardian-content > .notice {
+  margin: 0;
+}
+.guardian-workspace .definition {
+  display: grid;
+  grid-template-columns: minmax(90px, 120px) minmax(0, 1fr);
+  gap: 10px 16px;
+  margin: 18px 0;
+  font-size: 13px;
+}
+.guardian-workspace .definition dt {
+  color: var(--ink-500);
+}
+.guardian-workspace .definition dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.guardian-workspace .table-wrap {
+  max-width: 100%;
+  margin-top: 16px;
+  overflow-x: auto;
+}
+.guardian-workspace table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+.guardian-workspace :where(th, td) {
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+.guardian-workspace th {
+  background: var(--paper-0);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.guardian-workspace caption {
+  padding-bottom: 10px;
+  text-align: left;
+  color: var(--ink-500);
+  font-size: 12px;
+}
+.guardian-workspace .story-body {
+  max-height: 440px;
+  overflow: auto;
+  padding: 16px;
+  background: var(--paper-0);
+  border-radius: 10px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.85;
+}
+.guardian-workspace summary {
+  padding: 8px 0;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.guardian-workspace .checklist {
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.75;
+}
+.guardian-workspace .interest-fieldset {
+  min-width: 0;
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.guardian-workspace .guardian-stats {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.guardian-workspace .guardian-stats .panel {
+  min-height: 0;
+  padding: 18px;
+}
+.guardian-workspace .metric {
+  margin: 8px 0 0;
+  font-size: 30px;
+  line-height: 1.3;
+}
+.guardian-workspace .guardian-inline-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 12px;
+}
+.guardian-workspace .guardian-inline-form label {
+  flex: 1 1 220px;
+  max-width: 360px;
+  margin: 0;
+}
+.guardian-workspace .guardian-extra-settings > .panel {
+  margin-top: 16px;
+  background: var(--paper-0);
+}
+.guardian-workspace .guardian-counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.guardian-workspace .guardian-counts p {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  background: var(--paper-0);
+  border-radius: 9px;
+  font-size: 13px;
+}
+.guardian-workspace .guardian-counts small {
+  margin-left: 3px;
+  font-weight: 400;
+}
+.guardian-workspace .guardian-danger-zone {
+  border-color: var(--coral);
+  border-left-width: 4px;
+}
+.guardian-workspace .btn.danger {
+  border: 1px solid var(--coral);
+  background: var(--coral-soft);
+  color: var(--coral);
+}
+.guardian-workspace .guardian-attention {
+  border-left: 4px solid var(--gold);
+}
+.guardian-workspace :where(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 3px;
+}
+@media (max-width: 1100px) {
+  .guardian-workspace .guardian-columns,
+  .guardian-workspace .bottom-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .guardian-workspace .guardian-stats,
+  .guardian-workspace .guardian-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 600px) {
+  .guardian-workspace .guardian-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin-bottom: 20px;
+  }
+  .guardian-workspace .guardian-nav .chip {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .guardian-workspace .panel {
+    padding: 18px;
+  }
+  .guardian-workspace :where(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+    font-size: 16px;
+  }
+  .guardian-workspace .btn,
+  .guardian-workspace .chip {
+    min-height: 44px;
+  }
+  .guardian-workspace .definition {
+    grid-template-columns: minmax(72px, 90px) minmax(0, 1fr);
+    gap: 8px 12px;
+  }
+}

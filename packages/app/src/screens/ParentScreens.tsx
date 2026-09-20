@@ -1,6 +1,6 @@
 import { confirmAction, promptText } from '../components/dialogs';
 import { ChoiceControl } from '../components/ChoiceControl';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Link, Outlet } from 'react-router-dom';
 import { GuardianNav, GuardianProvider } from '../components/GuardianParts';
 import { useMutation } from '@tanstack/react-query';
@@ -14,10 +14,17 @@ import { Message, Wait } from '../components/QueryFeedback';
 import { ConsentHistory, NotificationSettings, SafetyEvents } from '../components/ManagementPanels';
 
 export function ProtectedParentScreen() {
-  const { scopeId } = useBackend();
+  const { scopeId, me } = useBackend();
+  // 게스트가 열 수 있는 서비스 안내는 보호자 API를 조회하지 않는다.
+  if (me?.user.role === 'GUEST') return <Outlet />;
   return (
     <GuardianProvider key={scopeId}>
-      <Outlet />
+      <div className="guardian-workspace">
+        <GuardianNav />
+        <div className="guardian-content">
+          <Outlet />
+        </div>
+      </div>
     </GuardianProvider>
   );
 }
@@ -70,296 +77,303 @@ export function ServerProfile() {
     <>
       <PageHeading
         eyebrow="MY LITTLE VILLAGE"
-        title="내 프로필과 설정"
+        title="프로필과 설정"
         description="티키가 기억할 내 이야기와 이용 설정을 살펴봐요."
       />
-      <GuardianNav />
       <Message text={action.message} />
-      {selector}
-      <form
-        className="panel"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          const f = new FormData(e.currentTarget);
-          void action.run(async () => {
-            await backend.request('profiles', json({ nickname: f.get('nickname') }));
-            await backend.refreshMe();
-            action.setMessage('아이 프로필을 만들었어요. 위에서 선택할 수 있어요.');
-          });
-        }}
-      >
-        <h2>아이 프로필 추가</h2>
-        <label>
-          별명
-          <input name="nickname" required maxLength={20} />
-        </label>
-        <button className="btn light" disabled={action.busy}>
-          프로필 만들기
-        </button>
-      </form>
-      {profile.data ? (
+      <div className="guardian-toolbar">{selector}</div>
+      <details className="panel guardian-add-profile">
+        <summary>아이 프로필 추가</summary>
         <form
-          className="panel"
-          key={`profile-${profileId}-${profile.data.profile.version}`}
+          className="guardian-inline-form"
           onSubmit={async (e) => {
             e.preventDefault();
             const f = new FormData(e.currentTarget);
             void action.run(async () => {
-              await backend.request(
-                `profiles/${profileId}`,
-                json(
-                  {
-                    nickname: f.get('nickname'),
-                    gradeOrAgeBand: f.get('grade') || null,
-                    schoolOrGroup: f.get('school') || null,
-                    interests: String(f.get('interests'))
-                      .split(',')
-                      .map((v) => v.trim())
-                      .filter(Boolean),
-                    growthGoal: f.get('goal') || null,
-                  },
-                  'PATCH',
-                  profile.data!.profile.version,
-                ),
-              );
+              await backend.request('profiles', json({ nickname: f.get('nickname') }));
               await backend.refreshMe();
+              action.setMessage('아이 프로필을 만들었어요. 위에서 선택할 수 있어요.');
             });
           }}
         >
-          <h2>아이 정보</h2>
           <label>
             별명
-            <input
-              name="nickname"
-              defaultValue={profile.data.profile.nickname}
-              required
-              maxLength={20}
-            />
+            <input name="nickname" required maxLength={20} />
           </label>
-          <label>
-            학년·연령대
-            <input
-              name="grade"
-              defaultValue={profile.data.profile.gradeOrAgeBand ?? ''}
-              maxLength={30}
-            />
-          </label>
-          <label>
-            소속 종류
-            <input
-              name="school"
-              defaultValue={profile.data.profile.schoolOrGroup ?? ''}
-              maxLength={20}
-            />
-          </label>
-          <label>
-            좋아하는 것 (쉼표로 나누어 최대 5개)
-            <input
-              name="interests"
-              defaultValue={(profile.data.profile.interests ?? []).join(', ')}
-            />
-          </label>
-          <label>
-            성장 목표
-            <input
-              name="goal"
-              defaultValue={profile.data.profile.growthGoal ?? ''}
-              maxLength={60}
-            />
-          </label>
-          <button
-            className="btn light"
-            disabled={action.busy || !profile.data.profile.permissions.includes('MANAGE_DATA')}
-          >
-            프로필 저장
+          <button className="btn light" disabled={action.busy}>
+            프로필 만들기
           </button>
         </form>
-      ) : (
-        profileId && <Wait error={profile.error} retry={profile.refetch} />
-      )}
-      {settings.data && (
-        <form
-          className="panel"
-          key={`settings-${profileId}-${settings.data.settings.version}`}
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const f = new FormData(e.currentTarget);
-            const days = Number(f.get('days'));
-            if (
-              days < settings.data!.settings.retentionDays &&
-              !(await confirmAction('보관 기간보다 오래된 대화가 정리 대상이 돼요. 변경할까요?'))
-            )
-              return;
-            void action.run(async () => {
-              const r = await backend.request<Model<'SettingsResponse'>>(
-                `profiles/${profileId}/settings`,
-                json(
-                  {
-                    voiceEnabled: f.has('voice'),
-                    ttsEnabled: f.has('tts'),
-                    guardianPreviewEnabled: f.has('preview'),
-                    theme: f.get('theme'),
-                    retentionDays: days,
-                  },
-                  'PATCH',
-                  settings.data!.settings.version,
-                ),
-              );
-              action.setMessage(r.retentionNotice?.message ?? '설정을 저장했어요.');
-            });
-          }}
-        >
-          <h2>이용 설정</h2>
-          <ChoiceControl
-            label="음성 사용 허용"
-            description="마이크 입력과 읽어주기를 사용할 수 있어요. 끄면 글로만 대화해요."
-            variant="switch"
-            name="voice"
-            defaultChecked={settings.data.settings.voiceEnabled}
-          />
-          <ChoiceControl
-            label="메시지 소리로 듣기"
-            variant="switch"
-            name="tts"
-            defaultChecked={settings.data.settings.ttsEnabled}
-          />
-          <ChoiceControl
-            label="보호자 미리보기"
-            variant="switch"
-            name="preview"
-            defaultChecked={settings.data.settings.guardianPreviewEnabled}
-          />
-          <label>
-            테마
-            <select name="theme" defaultValue={settings.data.settings.theme}>
-              <option value="AUTO">기기 설정</option>
-              <option value="LIGHT">밝게</option>
-              <option value="DARK">어둡게</option>
-            </select>
-          </label>
-          <label>
-            대화 보관 기간
-            <select name="days" defaultValue={settings.data.settings.retentionDays}>
-              {[30, 90, 180, 365].map((v) => (
-                <option value={v} key={v}>
-                  {v}일
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            className="btn light"
-            disabled={action.busy || !profile.data?.profile.permissions.includes('MANAGE_DATA')}
+      </details>
+      <div className="guardian-columns">
+        {profile.data ? (
+          <form
+            className="panel guardian-profile-form"
+            key={`profile-${profileId}-${profile.data.profile.version}`}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              void action.run(async () => {
+                await backend.request(
+                  `profiles/${profileId}`,
+                  json(
+                    {
+                      nickname: f.get('nickname'),
+                      gradeOrAgeBand: f.get('grade') || null,
+                      schoolOrGroup: f.get('school') || null,
+                      interests: String(f.get('interests'))
+                        .split(',')
+                        .map((v) => v.trim())
+                        .filter(Boolean),
+                      growthGoal: f.get('goal') || null,
+                    },
+                    'PATCH',
+                    profile.data!.profile.version,
+                  ),
+                );
+                await backend.refreshMe();
+              });
+            }}
           >
-            설정 저장
-          </button>
-        </form>
-      )}
-      <section className="panel" key={profileId}>
-        <h2>보호자 초대와 연결</h2>
-        <button
-          className="btn light"
-          disabled={!profileId || invitation.isPending}
-          onClick={() => invitation.mutate()}
-        >
-          보호자 초대 코드 만들기
-        </button>
-        {invitation.error && <Message text={errorMessage(invitation.error)} />}
-        {invitation.data?.invitation.profileId === profileId && (
-          <p>
-            초대 코드: <code>{invitation.data.invitation.token}</code> ·{' '}
-            {new Date(invitation.data.invitation.expiresAt).toLocaleString('ko-KR')}까지
-          </p>
+            <h2>아이 정보</h2>
+            <label>
+              별명
+              <input
+                name="nickname"
+                defaultValue={profile.data.profile.nickname}
+                required
+                maxLength={20}
+              />
+            </label>
+            <label>
+              학년·연령대
+              <input
+                name="grade"
+                defaultValue={profile.data.profile.gradeOrAgeBand ?? ''}
+                maxLength={30}
+              />
+            </label>
+            <label>
+              소속 종류
+              <input
+                name="school"
+                defaultValue={profile.data.profile.schoolOrGroup ?? ''}
+                maxLength={20}
+              />
+            </label>
+            <label>
+              좋아하는 것 (쉼표로 나누어 최대 5개)
+              <input
+                name="interests"
+                defaultValue={(profile.data.profile.interests ?? []).join(', ')}
+              />
+            </label>
+            <label>
+              성장 목표
+              <input
+                name="goal"
+                defaultValue={profile.data.profile.growthGoal ?? ''}
+                maxLength={60}
+              />
+            </label>
+            <button
+              className="btn light"
+              disabled={action.busy || !profile.data.profile.permissions.includes('MANAGE_DATA')}
+            >
+              프로필 저장
+            </button>
+          </form>
+        ) : (
+          profileId && <Wait error={profile.error} retry={profile.refetch} />
         )}
-        <label>
-          받은 초대 코드
-          <input value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" />
-        </label>
-        <button
-          className="btn light"
-          disabled={action.busy || !token.trim()}
-          onClick={() =>
-            void action.run(async () => {
-              await backend.request(
-                `guardian-links/invitations/${encodeURIComponent(token.trim())}/accept`,
-                json({}),
-              );
-              setToken('');
-              await backend.refreshMe();
-            })
-          }
-        >
-          초대 수락
-        </button>
-        {links.data?.items.map((link) => (
-          <div key={link.id}>
+        {settings.data && (
+          <form
+            className="panel"
+            key={`settings-${profileId}-${settings.data.settings.version}`}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const f = new FormData(e.currentTarget);
+              const days = Number(f.get('days'));
+              if (
+                days < settings.data!.settings.retentionDays &&
+                !(await confirmAction('보관 기간보다 오래된 대화가 정리 대상이 돼요. 변경할까요?'))
+              )
+                return;
+              void action.run(async () => {
+                const r = await backend.request<Model<'SettingsResponse'>>(
+                  `profiles/${profileId}/settings`,
+                  json(
+                    {
+                      voiceEnabled: f.has('voice'),
+                      ttsEnabled: f.has('tts'),
+                      guardianPreviewEnabled: f.has('preview'),
+                      theme: f.get('theme'),
+                      retentionDays: days,
+                    },
+                    'PATCH',
+                    settings.data!.settings.version,
+                  ),
+                );
+                action.setMessage(r.retentionNotice?.message ?? '설정을 저장했어요.');
+              });
+            }}
+          >
+            <h2>이용 설정</h2>
+            <ChoiceControl
+              label="음성 사용 허용"
+              description="마이크 입력과 읽어주기를 사용할 수 있어요. 끄면 글로만 대화해요."
+              variant="switch"
+              name="voice"
+              defaultChecked={settings.data.settings.voiceEnabled}
+            />
+            <ChoiceControl
+              label="메시지 소리로 듣기"
+              variant="switch"
+              name="tts"
+              defaultChecked={settings.data.settings.ttsEnabled}
+            />
+            <ChoiceControl
+              label="보호자 미리보기"
+              variant="switch"
+              name="preview"
+              defaultChecked={settings.data.settings.guardianPreviewEnabled}
+            />
+            <label>
+              테마
+              <select name="theme" defaultValue={settings.data.settings.theme}>
+                <option value="AUTO">기기 설정</option>
+                <option value="LIGHT">밝게</option>
+                <option value="DARK">어둡게</option>
+              </select>
+            </label>
+            <label>
+              대화 보관 기간
+              <select name="days" defaultValue={settings.data.settings.retentionDays}>
+                {[30, 90, 180, 365].map((v) => (
+                  <option value={v} key={v}>
+                    {v}일
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button
+              className="btn light"
+              disabled={action.busy || !profile.data?.profile.permissions.includes('MANAGE_DATA')}
+            >
+              설정 저장
+            </button>
+          </form>
+        )}
+      </div>
+      <details className="panel guardian-extra-settings">
+        <summary>보호자 연결 · 동의 · 공유 · 안전 기록 빠른 관리</summary>
+        <p className="muted">항목별 전체 내용은 위의 보호자 메뉴에서 확인할 수 있습니다.</p>
+        <section className="panel" key={profileId}>
+          <h2>보호자 초대와 연결</h2>
+          <button
+            className="btn light"
+            disabled={!profileId || invitation.isPending}
+            onClick={() => invitation.mutate()}
+          >
+            보호자 초대 코드 만들기
+          </button>
+          {invitation.error && <Message text={errorMessage(invitation.error)} />}
+          {invitation.data?.invitation.profileId === profileId && (
             <p>
-              {link.role === 'OWNER' ? '프로필 소유자' : '초대한 보호자'} ·{' '}
-              {link.status === 'ACTIVE' ? '연결됨' : '연결 해제됨'}
+              초대 코드: <code>{invitation.data.invitation.token}</code> ·{' '}
+              {new Date(invitation.data.invitation.expiresAt).toLocaleString('ko-KR')}까지
             </p>
-            {link.role !== 'OWNER' && link.status === 'ACTIVE' && (
-              <>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const f = new FormData(e.currentTarget);
-                    void action.run(async () => {
-                      await backend.request(
-                        `guardian-links/${link.id}`,
-                        json({ permissions: f.getAll('permissions') }, 'PATCH'),
-                      );
-                    });
-                  }}
-                >
-                  {[
-                    'VIEW_PROFILE',
-                    'VIEW_STORIES',
-                    'VIEW_REPORTS',
-                    'REVIEW_SHARING',
-                    'MANAGE_DATA',
-                  ].map((v, i) => (
-                    <ChoiceControl
-                      key={v}
-                      label={
-                        ['프로필 보기', '이야기 보기', '보고서 보기', '공유 확인', '데이터 관리'][
-                          i
-                        ]!
-                      }
-                      name="permissions"
-                      value={v}
-                      defaultChecked={link.permissions.includes(v)}
-                    />
-                  ))}
-                  <button className="btn light" disabled={action.busy}>
-                    권한 저장
-                  </button>
-                </form>
-                <button
-                  className="btn light"
-                  disabled={action.busy}
-                  onClick={async () => {
-                    if (await confirmAction('보호자 연결을 해제할까요?'))
+          )}
+          <label>
+            받은 초대 코드
+            <input value={token} onChange={(e) => setToken(e.target.value)} autoComplete="off" />
+          </label>
+          <button
+            className="btn light"
+            disabled={action.busy || !token.trim()}
+            onClick={() =>
+              void action.run(async () => {
+                await backend.request(
+                  `guardian-links/invitations/${encodeURIComponent(token.trim())}/accept`,
+                  json({}),
+                );
+                setToken('');
+                await backend.refreshMe();
+              })
+            }
+          >
+            초대 수락
+          </button>
+          {links.data?.items.map((link) => (
+            <div key={link.id}>
+              <p>
+                {link.role === 'OWNER' ? '프로필 소유자' : '초대한 보호자'} ·{' '}
+                {link.status === 'ACTIVE' ? '연결됨' : '연결 해제됨'}
+              </p>
+              {link.role !== 'OWNER' && link.status === 'ACTIVE' && (
+                <>
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      const f = new FormData(e.currentTarget);
                       void action.run(async () => {
-                        await backend.request(`guardian-links/${link.id}`, { method: 'DELETE' });
-                        await backend.refreshMe();
+                        await backend.request(
+                          `guardian-links/${link.id}`,
+                          json({ permissions: f.getAll('permissions') }, 'PATCH'),
+                        );
                       });
-                  }}
-                >
-                  연결 해제
-                </button>
-              </>
-            )}
-          </div>
-        ))}
-        {links.error && <Wait error={links.error} retry={links.refetch} />}
-      </section>
-      {profileId && (
-        <>
-          <ConsentHistory key={profileId} profileId={profileId} />
-          <ShareReviews key={`share-${profileId}`} profileId={profileId} />
-          <SafetyEvents key={`safety-${profileId}`} profileId={profileId} />
-        </>
-      )}
+                    }}
+                  >
+                    {[
+                      'VIEW_PROFILE',
+                      'VIEW_STORIES',
+                      'VIEW_REPORTS',
+                      'REVIEW_SHARING',
+                      'MANAGE_DATA',
+                    ].map((v, i) => (
+                      <ChoiceControl
+                        key={v}
+                        label={
+                          ['프로필 보기', '이야기 보기', '보고서 보기', '공유 확인', '데이터 관리'][
+                            i
+                          ]!
+                        }
+                        name="permissions"
+                        value={v}
+                        defaultChecked={link.permissions.includes(v)}
+                      />
+                    ))}
+                    <button className="btn light" disabled={action.busy}>
+                      권한 저장
+                    </button>
+                  </form>
+                  <button
+                    className="btn light"
+                    disabled={action.busy}
+                    onClick={async () => {
+                      if (await confirmAction('보호자 연결을 해제할까요?'))
+                        void action.run(async () => {
+                          await backend.request(`guardian-links/${link.id}`, { method: 'DELETE' });
+                          await backend.refreshMe();
+                        });
+                    }}
+                  >
+                    연결 해제
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+          {links.error && <Wait error={links.error} retry={links.refetch} />}
+        </section>
+        {profileId && (
+          <>
+            <ConsentHistory key={profileId} profileId={profileId} />
+            <ShareReviews key={`share-${profileId}`} profileId={profileId} />
+            <SafetyEvents key={`safety-${profileId}`} profileId={profileId} />
+          </>
+        )}
+      </details>
       <NotificationSettings />
       <Notifications />
     </>
@@ -529,12 +543,15 @@ export function ServerReport() {
         title="차곡차곡 쌓인 생각의 발자국"
         description="정답이나 점수보다, 아이가 어떻게 생각했는지 함께 살펴봐요."
       />
-      {selector}
-      {profileId && <ProfileReport key={profileId} profileId={profileId} />}
+      {profileId ? (
+        <ProfileReport key={profileId} profileId={profileId} selector={selector} />
+      ) : (
+        <div className="report-toolbar">{selector}</div>
+      )}
     </>
   );
 }
-function ProfileReport({ profileId }: { profileId: string }) {
+function ProfileReport({ profileId, selector }: { profileId: string; selector: ReactNode }) {
   const { request } = useBackend();
   const cache = useServerCache();
   const action = useAction();
@@ -560,17 +577,20 @@ function ProfileReport({ profileId }: { profileId: string }) {
   return (
     <>
       <Message text={action.message} />
-      <label>
-        기간
-        <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-          <option value="7d">이번 주</option>
-          <option value="30d">이번 달</option>
-          <option value="90d">최근 90일</option>
-        </select>
-      </label>
+      <div className="report-toolbar">
+        {selector}
+        <label>
+          기간
+          <select value={period} onChange={(e) => setPeriod(e.target.value)}>
+            <option value="7d">이번 주</option>
+            <option value="30d">이번 달</option>
+            <option value="90d">최근 90일</option>
+          </select>
+        </label>
+      </div>
       {q.data ? (
         <>
-          <div className="cards stats">
+          <div className="cards stats report-stats">
             <section className="panel">
               <span className="stat-label">생각을 나눈 날</span>
               <div className="metric">
@@ -596,7 +616,7 @@ function ProfileReport({ profileId }: { profileId: string }) {
               <small className="muted">생각을 넓히는 말</small>
             </section>
           </div>
-          <section className="panel">
+          <section className="panel report-timeline">
             <div className="section-title">
               <h2>생각을 나눈 발자국</h2>
               <small>
@@ -756,34 +776,39 @@ export function ServerData() {
     <>
       <PageHeading
         eyebrow="MY RECORDS"
-        title="소중한 기록을 직접 관리해요"
+        title="기록 관리"
         description="기록을 내려받거나, 남길 내용을 선택할 수 있어요."
       />
       <Message text={action.message} />
       {overview.data ? (
-        <section className="panel">
+        <section className="panel guardian-data-summary">
           <h2>저장된 데이터</h2>
-          {Object.entries(overview.data.counts).map(([k, v]) => (
-            <p key={k}>
-              {(
-                {
-                  profiles: '프로필',
-                  conversations: '대화',
-                  messages: '메시지',
-                  stories: '이야기',
-                  topics: '주제',
-                  words: '단어',
-                  books: '이야기책',
-                  activities: '모험',
-                  reports: '리포트',
-                  sharedItems: '공유',
-                  notifications: '알림',
-                  exports: '내보내기',
-                } as Record<string, string>
-              )[k] ?? k}{' '}
-              {v}개
-            </p>
-          ))}
+          <div className="guardian-counts">
+            {Object.entries(overview.data.counts).map(([k, v]) => (
+              <p key={k}>
+                {(
+                  {
+                    profiles: '프로필',
+                    conversations: '대화',
+                    messages: '메시지',
+                    stories: '이야기',
+                    topics: '주제',
+                    words: '단어',
+                    books: '이야기책',
+                    activities: '모험',
+                    reports: '리포트',
+                    sharedItems: '공유',
+                    notifications: '알림',
+                    exports: '내보내기',
+                  } as Record<string, string>
+                )[k] ?? k}{' '}
+                <strong>
+                  {v}
+                  <small>개</small>
+                </strong>
+              </p>
+            ))}
+          </div>
         </section>
       ) : (
         <Wait error={overview.error} retry={overview.refetch} />
@@ -839,7 +864,7 @@ export function ServerData() {
             <Wait error={exported.error} retry={exported.refetch} />
           ))}
       </section>
-      <section className="panel">
+      <section className="panel guardian-danger-zone">
         <h2>아이 데이터 삭제 예약</h2>
         <p>유예 기간 동안 취소할 수 있어요. 최근에 로그인한 계정으로 진행해 주세요.</p>
         <form
@@ -874,7 +899,7 @@ export function ServerData() {
             DELETE 입력
             <input name="confirmation" required pattern="DELETE" />
           </label>
-          <button className="btn light" disabled={action.busy || !!pending}>
+          <button className="btn danger" disabled={action.busy || !!pending}>
             삭제 예약
           </button>
         </form>
@@ -904,10 +929,13 @@ export function ServerData() {
             <Wait error={deletion.error} retry={deletion.refetch} />
           ))}
       </section>
-      <section className="panel">
+      <section className="panel guardian-danger-zone">
         <h2>계정 삭제</h2>
+        <p className="muted">
+          기록 내려받기와 다른 작업입니다. 삭제 범위와 처리 예정일을 확인한 뒤 진행해 주세요.
+        </p>
         <button
-          className="btn light"
+          className="btn danger"
           disabled={action.busy || !!accountId}
           onClick={async () => {
             if ((await promptText('계정을 삭제 예약하려면 DELETE를 입력해 주세요.')) === 'DELETE')
@@ -963,27 +991,40 @@ export function ServerTech() {
     streamingAvailable: boolean;
   }>('service-info');
   return (
-    <section className="panel">
+    <>
       <PageHeading
         eyebrow="ABOUT TIKI"
-        title="생각친구 티키를 소개해요"
+        title="기술·안전 안내"
         description="티키가 함께하는 방법과 기록을 지키는 약속이에요."
       />
       {q.data ? (
-        <>
+        <section className="panel">
+          <h2>서비스와 처리 환경</h2>
           <p>{q.data.service}</p>
-          <p>기록은 {q.data.storage}에 저장돼요.</p>
-          <p>AI 응답: {q.data.aiAvailable ? '사용 가능' : '서버의 준비된 안내 사용'}</p>
-          <p>
-            음성 입력:{' '}
-            {q.data.speechAvailable ? '사용 가능 · 보호자 동의 필요' : '현재 사용할 수 없음'}
-          </p>
-          <p>실시간 음성: {q.data.streamingAvailable ? '사용 가능' : '현재 사용할 수 없음'}</p>
-          <Link to="/profile">동의와 설정 확인</Link>
-        </>
+          <dl className="definition">
+            <dt>기록 저장</dt>
+            <dd>{q.data.storage}</dd>
+            <dt>AI 응답</dt>
+            <dd>{q.data.aiAvailable ? '사용 가능' : '서버의 준비된 안내 사용'}</dd>
+            <dt>음성 입력</dt>
+            <dd>
+              {q.data.speechAvailable ? '사용 가능 · 보호자 동의 필요' : '현재 사용할 수 없음'}
+            </dd>
+            <dt>실시간 음성</dt>
+            <dd>{q.data.streamingAvailable ? '사용 가능' : '현재 사용할 수 없음'}</dd>
+          </dl>
+          <div className="actions">
+            <Link className="btn light" to="/guardian/consent">
+              동의와 약관 확인
+            </Link>
+            <Link className="btn light" to="/profile">
+              이용 설정 확인
+            </Link>
+          </div>
+        </section>
       ) : (
         <Wait error={q.error} retry={q.refetch} />
       )}
-    </section>
+    </>
   );
 }

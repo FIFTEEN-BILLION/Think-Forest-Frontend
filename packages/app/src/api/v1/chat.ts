@@ -185,8 +185,16 @@ export function parseLoginParams(search: string) {
 }
 
 /** 로그인 뒤 갈 곳. 첫인사가 필요하면 첫인사로 먼저 보낸다. */
-export function postLoginPath(user: Pick<AuthUser, 'needsFirstGreeting'>, returnTo: string) {
+export function guestRestrictedPath(path: string) {
+  return /^\/(guardian|profile|data|story-share)([/?#]|$)/.test(path);
+}
+
+export function postLoginPath(
+  user: Pick<AuthUser, 'needsFirstGreeting'> & Partial<Pick<AuthUser, 'role'>>,
+  returnTo: string,
+) {
   const target = safeReturnTo(returnTo);
+  if (user.role === 'GUEST' && guestRestrictedPath(target)) return '/';
   if (!user.needsFirstGreeting || target.startsWith('/first-talk')) return target;
   return target === '/' ? '/first-talk' : `/first-talk?next=${encodeURIComponent(target)}`;
 }
@@ -194,6 +202,9 @@ export function postLoginPath(user: Pick<AuthUser, 'needsFirstGreeting'>, return
 export const LOGIN_ERROR_MESSAGES: Record<string, string> = {
   AUTH_PROVIDER_UNAVAILABLE: '카카오 로그인을 잠시 쓸 수 없어요. 조금 뒤 다시 해 주세요.',
   ACCESS_DENIED: '카카오 로그인을 취소했어요.',
+  KAKAO_CANCELLED: '카카오 로그인을 취소했어요.',
+  KAKAO_LOGIN_FAILED: '카카오 로그인을 완료하지 못했어요. 다시 시도해 주세요.',
+  INVALID_STATE: '로그인 요청이 만료됐어요. 다시 시도해 주세요.',
 };
 
 export const loginErrorMessage = (code: string | null) =>

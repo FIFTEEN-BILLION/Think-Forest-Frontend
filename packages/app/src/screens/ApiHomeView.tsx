@@ -8,10 +8,12 @@ export function ApiHomeView({
   home,
   stories,
   active,
+  guest = false,
 }: {
   home: Model<'HomeResponse'>;
   stories: Model<'StorySummary'>[];
   active: Model<'ActivitySessionOut'>[];
+  guest?: boolean;
 }) {
   const [category, setCategory] = useState('추천');
   const firstVisit = home.profile.needsFirstGreeting;
@@ -83,6 +85,11 @@ export function ApiHomeView({
             <Icon name={hero.icon} /> {hero.action} <Icon name="arrow" />
           </Link>
           <small>{hero.hint}</small>
+          {guest && !firstVisit && (
+            <Link className="home-text-link" to="/first-talk">
+              티키와 만나기 <Icon name="arrow" />
+            </Link>
+          )}
         </div>
         <div className="home-hero-picture" aria-hidden="true">
           <span className="home-picture-spark spark-one">✦</span>

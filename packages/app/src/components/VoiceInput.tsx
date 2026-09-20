@@ -20,11 +20,12 @@ export function VoiceInput({
   onText: (text: string) => void;
   disabled?: boolean;
 }) {
-  const { request, profileId, useApi } = useBackend();
+  const { request, profileId, useApi, me } = useBackend();
+  const guest = me?.user.role === 'GUEST';
   const settings = useServerQuery<Model<'SettingsResponse'>>(
     profileId ? `profiles/${profileId}/settings` : null,
   );
-  const voiceDisabled = !useApi || settings.data?.settings.voiceEnabled === false;
+  const voiceDisabled = guest || !useApi || settings.data?.settings.voiceEnabled === false;
   const apiUrl = useApiUrl();
   const [active, setActive] = useState(false);
   const [connecting, setConnecting] = useState(false);
@@ -307,9 +308,11 @@ export function VoiceInput({
       {failure && <p role="alert">{failure}</p>}
       {voiceDisabled && (
         <p>
-          {useApi
-            ? '보호자 설정에서 음성 사용이 꺼져 있어요. 글로 입력해 주세요.'
-            : '예시 체험에서는 글로 대화해 주세요.'}
+          {guest
+            ? '게스트 체험에서는 글로 대화해 주세요.'
+            : useApi
+              ? '보호자 설정에서 음성 사용이 꺼져 있어요. 글로 입력해 주세요.'
+              : '예시 체험에서는 글로 대화해 주세요.'}
         </p>
       )}
       <small>
